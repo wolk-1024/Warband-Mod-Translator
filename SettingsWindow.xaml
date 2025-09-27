@@ -1,0 +1,15 @@
+﻿<Window x:Class="ModTranslatorSettings.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:ModTranslatorSettings"
+        mc:Ignorable="d"
+        Title="Настройки" Height="300" Width="300">
+    <Grid>
+        <CheckBox x:Name="ShowID" Content="Показать столбец ID" HorizontalAlignment="Left" Margin="15,45,0,0" VerticalAlignment="Top" Width="151" Checked="ShowID_Checked"/>
+        <CheckBox x:Name="FreeExport" Content="Замена строк при экспорте" HorizontalAlignment="Left" Margin="15,75,0,0" VerticalAlignment="Top" Width="201"/>
+        <CheckBox x:Name="ImportLog" Content="Запись неудачного импорта" HorizontalAlignment="Left" Margin="15,105,0,0" VerticalAlignment="Top" Width="185" IsChecked="True"/>
+
+    </Grid>
+</Window>

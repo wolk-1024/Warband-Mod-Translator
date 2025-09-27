@@ -1,0 +1,15 @@
+﻿<Window x:Class="WarbandSearch.SearchWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:WarbandModTranslator"
+        mc:Ignorable="d"
+        Title="Поиск" Height="150" Width="350">
+    <Grid>
+        <TextBox x:Name="SearchTextBox" Margin="25,10,25,0" TextWrapping="Wrap" Text="Текст для поиска в таблице" VerticalAlignment="Top" Height="50"/>
+        <Button x:Name="ButtonSearch" Content="Найти" Margin="0,72,25,0" Click="ButtonSearch_Click" Height="25" VerticalAlignment="Top" HorizontalAlignment="Right" Width="60"/>
+        <CheckBox x:Name="CheckFullSearch" Content="Искать целиком" HorizontalAlignment="Left" Margin="24,77,0,0" VerticalAlignment="Top" FontSize="11" Width="106"/>
+
+    </Grid>
+</Window>
