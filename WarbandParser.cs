@@ -37,6 +37,7 @@ namespace WarbandParser
             "qstr_",    // quick strings
             "skl_",     // skills
             "skinkey_", // skins
+            "str_",     // strings
             "trp_",     // troops
             "ui_"       // ui
         };
@@ -856,6 +857,51 @@ namespace WarbandParser
             return null;
         }
 
+        public static List<ModTextRow>? LoadAndParseStringsFile(string FilePath)
+        {
+            if (string.IsNullOrEmpty(FilePath))
+                return null;
+
+            var ModText = LoadAndParseFile(FilePath, "str_");
+
+            if (ModText.Count > 0)
+            {
+                var ModTextResult = new List<ModTextRow>();
+
+                foreach (var StrLine in ModText)
+                {
+                    var StrArgs = GetModTextArgs(StrLine, "str_", 2);
+
+                    if (StrArgs.Count < 2) //
+                        continue;
+
+                    string LineID = StrArgs[0];
+
+                    if (!IsLineStartsWithPrefix(LineID))
+                        return null;
+
+                    string OriginalText = StrArgs[1].Replace("_", " ");
+
+                    if (!TextStartWithError(OriginalText))
+                    {
+                        ModTextResult.Add(
+                            new ModTextRow
+                            {
+                                RowId = LineID,
+                                OriginalText = OriginalText
+                            });
+                    }
+                }
+
+                int RemovedIds;
+
+                var Result = RemoveDuplicateIDs(ModTextResult, out RemovedIds);
+
+                return Result;
+            }
+            return null;
+        }
+
         public static List<ModTextRow>? LoadAndParseTroopsFile(string FilePath)
         {
             if (string.IsNullOrEmpty(FilePath))
@@ -997,7 +1043,7 @@ namespace WarbandParser
                     // Игнорим, т.к скорее всего мусор.
                     continue;
                 }
-                else if (Regex.IsMatch(Line, @"^(?=.*\p{L})[\p{L}\p{N}\x20-\x7E]+$")) // Если в строке есть юникод-буквы и знаки.
+                else if (Regex.IsMatch(Line, @"^(?=.*[A-Za-z])[\p{L}\p{N}\p{P}\p{S}]+$")) // Если в строке есть юникод-буквы и знаки.
                 {
                     Result.Add(Line);
 

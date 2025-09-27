@@ -102,6 +102,7 @@ namespace ModTranslator
             { "Быстрые строки",      ("quick_strings.txt",   "quick_strings.csv") },
             { "Навыки",              ("skills.txt",          "skills.csv") },
             { "Скины",               ("skins.txt",           "skins.csv") },
+            { "Игровые строки",      ("strings.txt",         "game_strings.csv") },
             { "Войска",              ("troops.txt",          "troops.csv") },
         };
 
@@ -343,6 +344,11 @@ namespace ModTranslator
                     case "skins.txt":
 
                         Result = LoadAndParseSkinsFile(FilePath);
+                        break;
+
+                    case "strings.txt":
+
+                        Result = LoadAndParseStringsFile(FilePath);
                         break;
 
                     case "troops.txt":
