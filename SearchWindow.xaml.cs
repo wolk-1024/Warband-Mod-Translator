@@ -6,7 +6,7 @@ namespace WarbandSearch
 {
     public partial class SearchWindow : Window
     {
-        MainTranslatorWindow MainWindow;
+        private readonly MainTranslatorWindow MainWindow;
 
         private (int RowIndex, int ColumnIndex) g_FoundedCell = (-1, -1);
 
@@ -81,25 +81,13 @@ namespace WarbandSearch
             if (CheckFullSearch.IsChecked != null && CheckFullSearch.IsChecked == true)
                 FullSearch = true;
 
-            var Result = MainWindow.FindCellByString(MainWindow.MainDataGrid, SearchTextBox.Text, StartRow, FullSearch, StringComparison.Ordinal);
+            var Result = MainWindow.FindCellByString(MainWindow.MainDataGrid, SearchTextBox.Text, StartRow, FullSearch, true);
 
             if (Result.ColumnIndex >= 0 || Result.RowIndex >= 0)
             {
                 g_FoundedCell = Result;
 
-                var Column = MainWindow.GetColumnByIndex(MainWindow.MainDataGrid, Result.ColumnIndex);
-
-                if (Column != null)
-                {
-                    if (Column.Visibility != Visibility.Visible)
-                    {
-                        g_FoundedCell = (-1, -1);
-
-                        MessageBox.Show("Ничего не найдено", "Поиск", MessageBoxButton.OK, MessageBoxImage.Information);
-                    }
-                    else
-                        MainWindow.FocusCell(MainWindow.MainDataGrid, Result.RowIndex, Result.ColumnIndex);
-                }
+                MainWindow.FocusCell(MainWindow.MainDataGrid, Result.RowIndex, Result.ColumnIndex);
             }
             else
             {

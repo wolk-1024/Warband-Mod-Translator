@@ -69,12 +69,12 @@ namespace ModTranslator
         /// <summary>
         /// Окно настроек.
         /// </summary>
-        private SettingsWindow g_OptionsWindow;
+        private readonly SettingsWindow g_OptionsWindow;
 
         /// <summary>
         /// Окошко поиска.
         /// </summary>
-        private SearchWindow g_SearchWindow;
+        private readonly SearchWindow g_SearchWindow;
 
         private int g_IndexSelectedFile = 0;
 
@@ -228,7 +228,7 @@ namespace ModTranslator
 
                 g_CurrentCellValue = string.Empty;
 
-                MainDataGrid.ItemsSource = null
+                MainDataGrid.ItemsSource = null;
                     ;
                 MainDataGrid.Items.Refresh();
 
@@ -436,13 +436,11 @@ namespace ModTranslator
                 if (Result != null)
                     return (string)Result;
             }
-            return "";
+            return string.Empty;
         }
 
         public ModTextRow? GetRowDataByIndex(int Index)
         {
-            var Result = new ModTextRow();
-
             if (MainDataGrid.Items.Count > Index && Index >= 0)
             {
                 object Data = MainDataGrid.Items[Index];
@@ -502,10 +500,10 @@ namespace ModTranslator
                 foreach (ModTextRow Data in TranslateData)
                 {
                     // Чувствителен к регистру.
-                    //var DataIndex = g_CurrentMainGridData.FindIndex(0, g_CurrentMainGridData.Count, Item => Item.ID == Data.ID); // Ищем совпадения по Id
+                    var DataIndex = g_CurrentMainGridData.FindIndex(0, g_CurrentMainGridData.Count, Item => Item.RowId == Data.RowId); // Ищем совпадения по Id
 
                     // Не чуствителен
-                    var DataIndex = g_CurrentMainGridData.FindIndex(0, g_CurrentMainGridData.Count, Item => string.Equals(Item.RowId, Data.RowId, StringComparison.OrdinalIgnoreCase));
+                    //var DataIndex = g_CurrentMainGridData.FindIndex(0, g_CurrentMainGridData.Count, Item => string.Equals(Item.RowId, Data.RowId, StringComparison.OrdinalIgnoreCase));
 
                     if (DataIndex >= 0)
                     {
@@ -689,14 +687,14 @@ namespace ModTranslator
                                 TranslatedLines--; // уменьшаем счётчик.
                         }
 
-                        if (g_CurrentCellValue == "") // Если ячейка была изменена и при этом она была пустой, то
+                        if (g_CurrentCellValue == string.Empty) // Если ячейка была изменена и при этом она была пустой, то
                             TranslatedLines++; // увеличиваем счётчик.
 
                         g_DataHasBeenChanged = true;
                     }
                     SetTranslateCountLabel(TranslatedLines, g_CurrentMainGridData.Count);
 
-                    g_CurrentCellValue = "";
+                    g_CurrentCellValue = string.Empty;
                 }
             }    
         }
@@ -735,7 +733,7 @@ namespace ModTranslator
         {
             int Result = -1;
 
-            foreach (var Column in MainDataGrid.Columns)
+            foreach (var Column in Data.Columns)
             {
                 Result++;
 
@@ -745,9 +743,9 @@ namespace ModTranslator
             return Result;
         }
 
-        public ModTextRow? SearchModTextByValue(string Value, int StartRow = 0, bool FullSearch = true, StringComparison CaseType = StringComparison.Ordinal)
+        public ModTextRow? SearchModTextByValue(string Value, int StartRow = 0, bool FullSearch = true, bool VisibleColumn = true, StringComparison CaseType = StringComparison.Ordinal)
         {
-            var Indexes = FindCellByString(MainDataGrid, Value, StartRow, FullSearch, CaseType);
+            var Indexes = FindCellByString(MainDataGrid, Value, StartRow, FullSearch, VisibleColumn, CaseType);
 
             if (Indexes.ColumnIndex >= 0 && Indexes.RowIndex >= 0)
             {
@@ -764,20 +762,26 @@ namespace ModTranslator
         /// <summary>
         /// 
         /// </summary>
+        /// 
         /// <param name="Table"></param>
         /// <param name="Value"></param>
         /// <param name="StartRow">Стартовый индекс строки от которой будет идти поиск</param>
         /// <param name="FullSearch">Поиск строки целиком, а не по первому вхождению.</param>
+        /// <param name="VisibleColumn">Поиск только в отображаемых столбцах</param>
         /// <param name="Case"></param>
         /// <returns></returns>
-        public (int RowIndex, int ColumnIndex) FindCellByString(DataGrid Table, string Value, int StartRow, bool FullSearch = false, StringComparison Case = StringComparison.Ordinal)
+        public (int RowIndex, int ColumnIndex) FindCellByString(DataGrid Table, string Value, int StartRow, bool FullSearch = false, bool VisibleColumn = true, StringComparison Case = StringComparison.Ordinal)
         {
             for (int Row = StartRow; Row < Table.Items.Count; Row++)
             {
-                var RowItem = Table.Items[Row];
-
                 for (int Col = 0; Col < Table.Columns.Count; Col++)
                 {
+                    if (VisibleColumn) // Поиск только в видимых столбцах.
+                    {
+                        if (Table.Columns[Col].Visibility != Visibility.Visible)
+                            continue;
+                    }
+
                     var CellValue = GetCellStringValue(Table, Row, Col);
 
                     if (CellValue != null)
@@ -828,9 +832,6 @@ namespace ModTranslator
 
         private void SelectFilesBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (SelectFilesBox.SelectedValue == null)
-                return;
-
             if (g_IndexSelectedFile != SelectFilesBox.SelectedIndex) // Защита от повторной загрузки.
             {
                 string? SelectedValue = SelectFilesBox.SelectedValue.ToString();
@@ -870,7 +871,6 @@ namespace ModTranslator
 
                 if (LoadOriginalFilesToFileBox(FolderDialog.FolderName) > 0)
                 {
-
                     if (LoadFileBoxItemByIndex(0))
                     {
                         EnableControlButtons();
@@ -913,7 +913,7 @@ namespace ModTranslator
             {
                 var Result = ImportTranslate(DialogFile.FileName);
 
-                if (Result.FailedLoad.Count() > 0 && g_OptionsWindow.ImportLog.IsChecked == true)
+                if (Result.FailedLoad.Count > 0 && g_OptionsWindow.ImportLog.IsChecked == true)
                 {
                     using (StreamWriter WriteText = new StreamWriter("failed_" + Path.GetFileName(DialogFile.FileName)))
                     {
@@ -922,7 +922,7 @@ namespace ModTranslator
                     }
                 }
 
-                var FormatedResult = string.Format("Загружено: {0}\rНет совпадений: {1}", Result.SuccessLoaded, Result.FailedLoad.Count());
+                var FormatedResult = string.Format("Загружено: {0}\rНет совпадений: {1}", Result.SuccessLoaded, Result.FailedLoad.Count);
 
                 MessageBox.Show(FormatedResult, "Импорт", MessageBoxButton.OK, MessageBoxImage.Information);
 
@@ -1158,7 +1158,7 @@ namespace ModTranslator
 
         private void SearchMenu_Click(object sender, RoutedEventArgs e)
         {
-            g_OptionsWindow.Owner = null;
+            g_SearchWindow.Owner = null;
 
             g_SearchWindow.Show();
 

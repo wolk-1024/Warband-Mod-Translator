@@ -62,7 +62,7 @@ namespace ModTranslatorSettings
 
         private void ShowID_Checked(object sender, RoutedEventArgs e)
         {
-            if (ShowID.IsChecked == true)
+            if (ShowID.IsChecked == true && MainWindow != null)
             {
                 MainWindow.SetColumnVisibility("ID", Visibility.Visible);
             }
@@ -70,7 +70,7 @@ namespace ModTranslatorSettings
 
         private void ShowID_Unchecked(object sender, RoutedEventArgs e)
         {
-            if (ShowID.IsChecked == false)
+            if (ShowID.IsChecked == false && MainWindow != null)
             {
                 MainWindow.SetColumnVisibility("ID", Visibility.Collapsed);
             }

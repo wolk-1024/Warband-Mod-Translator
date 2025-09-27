@@ -13,8 +13,6 @@
 using System.IO;
 using System.Text.RegularExpressions;
 
-using WarbandModTranslator;
-
 namespace WarbandParser
 {
     public static class Parser
@@ -422,7 +420,7 @@ namespace WarbandParser
 
                     string NewID = OldID + "_pl";
 
-                    ItemNamePlural += " (plural)";
+                    //ItemNamePlural += " (plural)";
 
                     if (!TextStartWithError(ItemName))
                     {
@@ -887,7 +885,7 @@ namespace WarbandParser
 
                     string NewID = OldID + "_pl";
 
-                    TroopsNamePlural += " (plural)";
+                    //TroopsNamePlural += " (plural)";
 
                     if (!TextStartWithError(TroopsName))
                     {
@@ -919,14 +917,28 @@ namespace WarbandParser
             return null;
         }
 
-        public static bool IsOnlySymbolsInLine(string Input)
+        public static bool IsAllowSymbols(string Input)
         {
-            Regex ValidPattern = new Regex(@"^[!_.{} ]*$");
+            char[] AllowChars = { '_', '.', ',', '{', '!', '}'};
 
-            if (string.IsNullOrEmpty(Input))
-                return false;
+            foreach (char Char in Input)
+            {
+                if (!AllowChars.Contains(Char))
+                    return false;
+            }
+            return true;
+        }
 
-            return ValidPattern.IsMatch(Input);
+        public static bool IsNumber(string Input)
+        {
+            if (!string.IsNullOrWhiteSpace(Input))
+            {
+                Input = Input.Trim();
+
+                if (double.TryParse(Input, out _))
+                    return true;
+            }
+            return false;
         }
 
         /// <summary>
@@ -945,32 +957,51 @@ namespace WarbandParser
 
             long FoundedArgs = 0;
 
-            var SplitData = Data.Split(" ");
+            bool FoundedPrefix = false;
+
+            var SplitData = Data.Split(" ", StringSplitOptions.RemoveEmptyEntries);
 
             foreach (var Line in SplitData)
             {
                 if (FoundedArgs >= MaxArgs)
                     break;
 
-                if (string.IsNullOrEmpty(Line))
-                    continue;   
-
                 if (IsLineStartsWithPrefix(Line, Prefix)) // Если id первый параметр
+                {
+                    if (FoundedPrefix) // Если ещё один префикс, то ошибка.
+                    {
+                        Result.Clear();
+
+                        break;
+                    }
+                    else
+                    {
+                        Result.Add(Line);
+
+                        FoundedArgs++;
+
+                        FoundedPrefix = true;
+                    }
+                }
+                else if (Regex.IsMatch(Line, @"^[^\p{L}\p{N}\s]+$")) // Если одни знаки.
+                {
+                    if (TextStartWithError(Line))
+                        Result.Add(Line);
+
+                    FoundedArgs++;
+
+                    continue;
+                }
+                else if (IsNumber(Line)) // Если число
+                {
+                    // Игнорим, т.к скорее всего мусор.
+                    continue;
+                }
+                else if (Regex.IsMatch(Line, @"^(?=.*\p{L})[\p{L}\p{N}\x20-\x7E]+$")) // Если в строке есть юникод-буквы и знаки.
                 {
                     Result.Add(Line);
 
                     FoundedArgs++;
-                }
-                else
-                {
-                    var Founded = Regex.Match(Line, @"^(?=.*[A-Za-z])[\x20-\x7E]+$"); // Если в строке есть буквы и знаки
-
-                    if (Founded.Success)
-                    {
-                        Result.Add(Founded.Value);
-
-                        FoundedArgs++;
-                    }
                 }
             }
             return Result;

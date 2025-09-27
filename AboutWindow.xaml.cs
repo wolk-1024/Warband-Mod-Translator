@@ -13,6 +13,8 @@ namespace WarbandAbout
             this.ResizeMode = ResizeMode.NoResize;
 
             this.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+
+            this.ButtonAboutOk.Click += ButtonAboutOk_Click;
         }
 
         public AboutWindow()
