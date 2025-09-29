@@ -250,7 +250,7 @@ namespace ModTranslator
         {
             try
             {
-                string[] FileLines = File.ReadAllLines(FileName, Encoding.Unicode);
+                string[] FileLines = File.ReadAllLines(FileName, Encoding.UTF8);
 
                 var Lines = new List<ModTextRow>();
 
