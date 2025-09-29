@@ -250,7 +250,7 @@ namespace ModTranslator
         {
             try
             {
-                string[] FileLines = File.ReadAllLines(FileName, Encoding.UTF8);
+                string[] FileLines = File.ReadAllLines(FileName, Encoding.Unicode);
 
                 var Lines = new List<ModTextRow>();
 
@@ -262,7 +262,11 @@ namespace ModTranslator
 
                         if (Result.Length > 1)
                         {
-                            Lines.Add(new ModTextRow { RowId = Result[0], TranslatedText = Result[1] });
+                            Lines.Add(
+                                new ModTextRow {
+                                    RowId = Result[0],
+                                    TranslatedText = Result[1] 
+                                });
                         }
                     }
                 }
@@ -564,7 +568,7 @@ namespace ModTranslator
                     {
                         var Prefix = ExtractPrefixFromId(TextData.RowId);
 
-                        WriteText.WriteLine(Prefix + "1164|Dummy first line");
+                        WriteText.WriteLine(Prefix + "1164|Do not delete this line");
 
                         WriteDummy = true;
                     }

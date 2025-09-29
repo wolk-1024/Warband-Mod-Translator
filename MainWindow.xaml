@@ -20,7 +20,7 @@
 
         <ComboBox x:Name="SelectFilesBox" Margin="568,37,0,0" VerticalAlignment="Top" Height="25" IsEnabled="False" SelectedIndex="0" Grid.Column="1" SelectionChanged="SelectFilesBox_SelectionChanged" Grid.ColumnSpan="2" HorizontalAlignment="Left" Width="180"/>
 
-        <DataGrid x:Name="MainDataGrid" Margin="15,121,15,15" AutoGenerateColumns="false" Grid.ColumnSpan="3" ColumnWidth="*" SelectionMode="Single" SelectionUnit="Cell" CanUserDeleteRows="False" CanUserAddRows="False" EnableRowVirtualization="True" CanUserResizeRows="True">
+        <DataGrid x:Name="MainDataGrid" Margin="15,121,15,15" AutoGenerateColumns="false" Grid.ColumnSpan="3" ColumnWidth="*" SelectionMode="Single" SelectionUnit="Cell" CanUserDeleteRows="False" CanUserAddRows="False" EnableRowVirtualization="True" CanUserResizeRows="True" FontSize="14">
             <DataGrid.Columns>
 
                 <DataGridTextColumn Header="ID" Binding="{Binding RowId}" Width="200" CanUserSort="False" CanUserReorder="False" IsReadOnly="false" Visibility="Collapsed">

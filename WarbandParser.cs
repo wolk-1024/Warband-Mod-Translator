@@ -1,5 +1,5 @@
 ﻿/*
- *  Парсер v27.09.2025
+ *  Парсер v29.09.2025
  *  
  *  Известные проблемы: 
  *  
@@ -11,6 +11,7 @@
  */
 
 using System.IO;
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace WarbandParser
@@ -220,7 +221,9 @@ namespace WarbandParser
 
             if (File.Exists(FilePath))
             {
-                string TextData = File.ReadAllText(FilePath);
+                string TextData = EncodingTextFile.ReadTextFileAndConvertTo(FilePath, Encoding.Unicode);
+
+                //string TextData = File.ReadAllText(FilePath, Encoding.UTF8);
 
                 if (TextData.Length > 0)
                     Result = ParseTextData(TextData, Prefix);
@@ -228,12 +231,14 @@ namespace WarbandParser
             return Result;
         }
 
+        /*
         private static ModTextRow DummyLine(string Prefix)
         {
-            string DummyLine = "Dummy first line";
+            string DummyLine = "Do not delete this line";
 
             return new ModTextRow { RowId = Prefix + "1164", OriginalText = DummyLine, TranslatedText = DummyLine };
         }
+        */
 
         public static string ExtractPrefixFromId(string FullID)
         {
@@ -366,23 +371,22 @@ namespace WarbandParser
 
                     string NewID = OldID + "_text"; // ip_name + _text
 
-                    // Возможно, нужно сделать проверку на блокируещий символ через TextStartWithError?
+                    if (!TextStartWithError(IpValue))
+                    {
+                        ModTextResult.Add(
+                            new ModTextRow{
+                                RowId = OldID, 
+                                OriginalText = IpValue
+                            });
 
-                    ModTextResult.Add(
-                        new ModTextRow
-                        {
-                            RowId = OldID,
-                            OriginalText = IpValue
-                        });
-
-                    ModTextResult.Add(
-                        new ModTextRow
-                        {
-                            RowId = NewID,
-                            OriginalText = IpText
-                        });
+                        ModTextResult.Add(
+                            new ModTextRow
+                            {
+                                RowId = NewID,
+                                OriginalText = IpText
+                            });
+                    }
                 }
-
                 int RemovedIds;
 
                 var Result = RemoveDuplicateIDs(ModTextResult, out RemovedIds);
@@ -1043,7 +1047,7 @@ namespace WarbandParser
                     // Игнорим, т.к скорее всего мусор.
                     continue;
                 }
-                else if (Regex.IsMatch(Line, @"^(?=.*[A-Za-z])[\p{L}\p{N}\p{P}\p{S}]+$")) // Если в строке есть юникод-буквы и знаки.
+                else if (Regex.IsMatch(Line, @"^(?=.*\p{L})[\p{L}\p{N}\p{P}\p{S}]+$")) // Если в строке есть юникод-буквы и знаки.
                 {
                     Result.Add(Line);
 
