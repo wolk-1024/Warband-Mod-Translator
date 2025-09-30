@@ -7,7 +7,7 @@
  *  Так же игнорируются значения, полностью состоящие из пробелов, знаков препинания и пустых строк. (например qstr_____ ____)
  *  Не обрабатываются у id слитные конструкции типа: qstr_{!}blabla
  *  
- *  Тем не менее, пока этого достаточно для перевода 99.9% контента.
+ *  Тем не менее, пока этого достаточно для перевода 99% контента.
  */
 
 using System.IO;
@@ -276,6 +276,9 @@ namespace WarbandParser
                         return null;
 
                     string OriginalText = DlgaArgs[1].Replace("_", " ");
+
+                    if (OriginalText == "NO VOICEOVER")
+                        continue;
 
                     if (!TextStartWithError(OriginalText))
                     {
@@ -991,6 +994,12 @@ namespace WarbandParser
             return false;
         }
 
+        private static bool IsSelectorLine(string Input)
+        {
+            //
+            return false;
+        }
+
         /// <summary>
         /// Функция возвращает только строковые параметры, численные значение, знаковые не обрабатываются.
         /// </summary>
@@ -1033,18 +1042,15 @@ namespace WarbandParser
                         FoundedPrefix = true;
                     }
                 }
-                else if (Regex.IsMatch(Line, @"^[^\p{L}\p{N}\s]+$")) // Если одни знаки.
+                else if (Regex.IsMatch(Line, @"^[^\p{L}]*$")) // Если одни знаки и цифры.
                 {
                     if (TextStartWithError(Line))
+                    {
                         Result.Add(Line);
 
-                    FoundedArgs++;
+                        FoundedArgs++;
+                    }
 
-                    continue;
-                }
-                else if (IsNumber(Line)) // Если число
-                {
-                    // Игнорим, т.к скорее всего мусор.
                     continue;
                 }
                 else if (Regex.IsMatch(Line, @"^(?=.*\p{L})[\p{L}\p{N}\p{P}\p{S}]+$")) // Если в строке есть юникод-буквы и знаки.
