@@ -1062,18 +1062,17 @@ namespace ModTranslator
                 }
                 else
                 {
-                    g_CompareMode = true;
-
-                    ChooseModAndSeeDifference();
+                    if (ChooseModAndSeeDifference())
+                        g_CompareMode = true;
                 }
                 e.Handled = true;
             }
         }
 
-        private void ChooseModAndSeeDifference()
+        private bool ChooseModAndSeeDifference()
         {
             if (!IsLoadedTextData())
-                return;
+                return false;
 
             var FolderDialog = new OpenFolderDialog();
 
@@ -1092,7 +1091,7 @@ namespace ModTranslator
                 {
                     MessageBox.Show($"Не найден файл {TargetFile}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
 
-                    return;
+                    return false;
                 }
 
                 var LoadedData = ProcessOriginalFiles(TargetFile);
@@ -1101,7 +1100,7 @@ namespace ModTranslator
                 {
                     MessageBox.Show($"Неверный мод {FolderDialog.FolderName}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
 
-                    return;
+                    return false;
                 }
 
                 var ModChanges = GetModTextChanges(g_CurrentMainGridData, LoadedData);
@@ -1112,15 +1111,16 @@ namespace ModTranslator
 
                     //return;
                 }
-                else
-                    g_DataHasBeenChanged = true;
 
                 UnloadTableTextData();
 
                 UpdateTableTextData(ModChanges);
 
                 SetTranslateCountLabel();
+
+                return true;
             }
+            return false;
         }
 
         private void FocusOnRow(ModTextRow RowData)
