@@ -5,6 +5,7 @@
  *  
  *  Исправить недостатки парсера.
  *  Добавить локализацию на английский.
+ *  Доработать режим сравнения.
  *  Добавить работу с несколькими категориями одновременно, без перезагрузки таблицы.
  *  Добавить больше горячих клавиш для поиска.
  */
@@ -70,9 +71,9 @@ namespace ModTranslator
         private List<ModTextRow> g_CurrentMainGridData = new List<ModTextRow>();
 
         /// <summary>
-        /// 
+        /// Режим сравнения версий.
         /// </summary>
-        //public bool g_CompareMode = false;
+        public bool g_CompareMode = false;
 
         //private List<CollectionTextData> g_CollectionTextData = new List<CollectionTextData>(); //
 
@@ -86,7 +87,7 @@ namespace ModTranslator
         /// </summary>
         private readonly SearchWindow g_SearchWindow;
 
-        private int g_IndexSelectedFile = 0;
+        //private int g_IndexSelectedFile = 0;
 
         public class TextImportInfo
         {
@@ -202,7 +203,7 @@ namespace ModTranslator
 
         private void DataTextChangedMessage()
         {
-            if (g_DataHasBeenChanged)
+            if (g_DataHasBeenChanged && IsLoadedTextData())
             {
                 MessageBoxResult Message = MessageBox.Show("Данные не сохранены. Сохранить?", "Подтверждение", MessageBoxButton.YesNo, MessageBoxImage.Warning);
 
@@ -426,9 +427,7 @@ namespace ModTranslator
             }
             if (Result > 0)
             {
-                SelectFilesBox.ItemsSource = NewFilesList; // Херня вызывает срабатывание SelectFilesBox_SelectionChanged как итог файл может грузиться более 1 раза. Надо костыль городить.
-
-                g_IndexSelectedFile = 0;
+                SelectFilesBox.ItemsSource = NewFilesList; // Херня вызывает срабатывание SelectFilesBox_SelectionChanged как итог файл может грузиться более 1 раза.
 
                 SelectFilesBox.SelectedIndex = 0; // Начинаем список с 1 позиции. Не трогать.
 
@@ -636,7 +635,12 @@ namespace ModTranslator
 
             FileDialog.Filter = "Файл перевода|*.csv";
 
-            FileDialog.FileName = GetTranslateFileNameFromFileBox();
+            var CsvName = GetTranslateFileNameFromFileBox();
+
+            if (g_CompareMode)
+                FileDialog.FileName = "new_" + CsvName;
+            else
+                FileDialog.FileName = CsvName;
 
             FileDialog.OverwritePrompt = true; // Спросить о перезаписи файла.
 
@@ -865,29 +869,30 @@ namespace ModTranslator
 
         private void SelectFilesBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (g_IndexSelectedFile != SelectFilesBox.SelectedIndex) // Защита от повторной загрузки.
+            g_CompareMode = false;
+
+            string? SelectedValue = SelectFilesBox.SelectedValue.ToString();
+
+            if (!string.IsNullOrEmpty(SelectedValue))
             {
-                string? SelectedValue = SelectFilesBox.SelectedValue.ToString();
-
-                if (string.IsNullOrEmpty(SelectedValue))
-                    return;
-
                 string FilePath = g_ModFolderPath + "\\" + g_BindingsFileNames[SelectedValue].OriginalFile;
 
-                DataTextChangedMessage();
-
-                if (ProcessAndLoadOriginalFiles(FilePath))
+                if (!string.Equals(g_CurrentOriginalFile, FilePath))
                 {
-                    g_CurrentOriginalFile = FilePath;
+                    DataTextChangedMessage();
 
-                    FocusFirstRow();
+                    if (ProcessAndLoadOriginalFiles(FilePath))
+                    {
+                        FocusFirstRow();
 
-                    EnableControlButtons();
+                        EnableControlButtons();
 
-                    SetTranslateCountLabel();
+                        SetTranslateCountLabel();
+
+                        g_CurrentOriginalFile = FilePath;
+                    }
                 }
             }
-            g_IndexSelectedFile = SelectFilesBox.SelectedIndex;
         }
 
         private void Button_Click(object sender, RoutedEventArgs e)
@@ -898,18 +903,20 @@ namespace ModTranslator
 
             FolderDialog.Title = "Выбрать папку с установленным модом";
 
+            FolderDialog.Multiselect = false;
+
             if (FolderDialog.ShowDialog() == true)
             {
-                g_ModFolderPath = FolderDialog.FolderName;
-
-                ModPathText.Text = FolderDialog.FolderName;
-
                 SelectFilesBox.IsEnabled = true;
 
                 if (LoadOriginalFilesToFileBox(FolderDialog.FolderName) > 0) // Fixme: Вызывает срабатывание SelectFilesBox_SelectionChanged
                 {
+                    g_ModFolderPath = FolderDialog.FolderName;
+
                     if (LoadFileBoxItemByIndex(0))
                     {
+                        ModPathText.Text = FolderDialog.FolderName;
+
                         EnableControlButtons();
                     }
                     else
@@ -1000,8 +1007,6 @@ namespace ModTranslator
         {
             if (e.Key == Key.S && Keyboard.Modifiers == ModifierKeys.Control) // Ctrl + S
             {
-                e.Handled = true;
-
                 g_DataHasBeenChanged = false;
 
                 if (string.IsNullOrEmpty(g_FileForExport) && IsLoadedTextData())
@@ -1018,6 +1023,7 @@ namespace ModTranslator
 
                     ExportModTextToFile(g_FileForExport);
                 }
+                e.Handled = true;
             }
 
             if (e.Key == Key.Z && Keyboard.Modifiers == ModifierKeys.Control) // Ctrl + Z
@@ -1046,11 +1052,21 @@ namespace ModTranslator
 
             if (e.Key == Key.F && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift)) // Ctrl + Shift + F
             {
-                e.Handled = true;
-
                 DataTextChangedMessage();
 
-                ChooseModAndSeeDifference();
+                if (g_CompareMode)
+                {
+                    g_CompareMode = false;
+
+                    ProcessAndLoadOriginalFiles(g_CurrentOriginalFile);
+                }
+                else
+                {
+                    g_CompareMode = true;
+
+                    ChooseModAndSeeDifference();
+                }
+                e.Handled = true;
             }
         }
 
@@ -1094,16 +1110,16 @@ namespace ModTranslator
                 {
                     MessageBox.Show($"Разницы нет", "Сравнение", MessageBoxButton.OK, MessageBoxImage.Information);
 
-                    return;
+                    //return;
                 }
+                else
+                    g_DataHasBeenChanged = true;
 
                 UnloadTableTextData();
 
                 UpdateTableTextData(ModChanges);
 
                 SetTranslateCountLabel();
-
-                g_DataHasBeenChanged = true;
             }
         }
 
