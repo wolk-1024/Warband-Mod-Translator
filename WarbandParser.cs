@@ -241,15 +241,6 @@ namespace WarbandParser
             return Result;
         }
 
-        /*
-        private static ModTextRow DummyLine(string Prefix)
-        {
-            string DummyLine = "Do not delete this line";
-
-            return new ModTextRow { RowId = Prefix + "1164", OriginalText = DummyLine, TranslatedText = DummyLine };
-        }
-        */
-
         public static string ExtractPrefixFromId(string FullID)
         {
             if (IsLineStartsWithPrefix(FullID))

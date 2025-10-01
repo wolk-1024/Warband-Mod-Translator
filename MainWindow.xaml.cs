@@ -87,8 +87,6 @@ namespace ModTranslator
         /// </summary>
         private readonly SearchWindow g_SearchWindow;
 
-        //private int g_IndexSelectedFile = 0;
-
         public class TextImportInfo
         {
             public int SuccessLoaded { get; set; }
@@ -170,7 +168,6 @@ namespace ModTranslator
             SearchMenu.ToolTip = "Ctrl + F";
         }
 
-        // Конструктор.
         public MainTranslatorWindow()
         {
             InitializeComponent();
@@ -190,12 +187,15 @@ namespace ModTranslator
             {
                 MessageBoxResult Result = MessageBox.Show("Данные были изменены. Выйти без сохранения?", "Подтверждение", MessageBoxButton.YesNo, MessageBoxImage.Warning);
 
-                if (Result == MessageBoxResult.No)
-                    e.Cancel = true;
-                else
+                if (Result == MessageBoxResult.Yes)
                     e.Cancel = false;
-            }
+                else
+                {
+                    e.Cancel = true;
 
+                    return;
+                }
+            }
             g_OptionsWindow.CloseWindow();
 
             g_SearchWindow.CloseWindow();
@@ -257,35 +257,33 @@ namespace ModTranslator
             MainDataGrid.Items.Refresh();
         }
 
-        public List<ModTextRow> ReadCsvFile(string FileName)
+        public static List<ModTextRow> ReadCsvFile(string FileName)
         {
+            var Result = new List<ModTextRow>();
+
             try
             {
                 string[] FileLines = File.ReadAllLines(FileName, Encoding.UTF8);
 
-                var Lines = new List<ModTextRow>();
-
                 foreach (string Line in FileLines)
                 {
-                    if (!string.IsNullOrEmpty(Line))
-                    {
-                        var Result = Line.Split('|');
+                    var SplitLine = Line.Split('|', StringSplitOptions.RemoveEmptyEntries);
 
-                        if (Result.Length > 1)
-                        {
-                            Lines.Add(
-                                new ModTextRow {
-                                    RowId = Result[0],
-                                    TranslatedText = Result[1] 
-                                });
-                        }
+                    if (SplitLine.Length > 1)
+                    {
+                        Result.Add(
+                            new ModTextRow
+                            {
+                                RowId = SplitLine[0],
+                                TranslatedText = SplitLine[1]
+                            });
                     }
                 }
-                return Lines;
+                return Result;
             }
             catch (Exception)
             {
-                return new List<ModTextRow>();
+                return Result;
             }
         }
 
