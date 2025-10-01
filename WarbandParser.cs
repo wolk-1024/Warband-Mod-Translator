@@ -19,11 +19,21 @@ namespace WarbandParser
     public static class Parser
     {
         /// <summary>
+        /// Регулярка для поиска только знаков и цифр.
+        /// </summary>
+        private static readonly Regex RegSymbolsAndNumbers = new Regex(@"^[^\p{L}]*$", RegexOptions.Compiled);
+
+        /// <summary>
+        /// Регулярка для слов и знаков
+        /// </summary>
+        private static readonly Regex RegWordsAndSymbols = new Regex(@"^(?=.*\p{L})[\p{L}\p{N}\p{P}\p{S}]+$", RegexOptions.Compiled);
+
+        /// <summary>
         /// Глобалка для игнорирования {!} в строках. Не трогать.
         /// </summary>
         public static bool g_IgnoreBlockingSymbol = false;
 
-        private readonly static string[] g_IdPrefixesList =
+        private readonly static string[] IdPrefixesList =
         {
             "dlga_",    // dialogs
             "fac_",     // factions
@@ -57,7 +67,7 @@ namespace WarbandParser
         {
             if (!string.IsNullOrEmpty(Input))
             {
-                foreach (string Prefix in g_IdPrefixesList)
+                foreach (string Prefix in IdPrefixesList)
                 {
                     if (Input.StartsWith(Prefix) && Input.EndsWith(string.Empty))
                         return true;
@@ -80,7 +90,7 @@ namespace WarbandParser
         {
             if (!string.IsNullOrEmpty(Input))
             {
-                foreach (string Prefix in g_IdPrefixesList)
+                foreach (string Prefix in IdPrefixesList)
                 {
                     if (Input.IndexOf(Prefix) >= 0 && Input.EndsWith(string.Empty))
                         return true;
@@ -970,16 +980,33 @@ namespace WarbandParser
             return null;
         }
 
-        public static bool IsAllowSymbols(string Input)
+        /// <summary>
+        /// Возвращает разницу между новым и старым списком переводов.
+        /// </summary>
+        /// <param name="NewRows">Новый перевод</param>
+        /// <param name="OldRows">Старый перевод</param>
+        /// <returns></returns>
+        public static List<ModTextRow> GetModTextChanges(List<ModTextRow> NewRows, List<ModTextRow> OldRows, StringComparison CompareType = StringComparison.OrdinalIgnoreCase)
         {
-            char[] AllowChars = { '_', '.', ',', '{', '!', '}'};
+            var Result = new List<ModTextRow> { };
 
-            foreach (char Char in Input)
+            foreach (var RowData in NewRows)
             {
-                if (!AllowChars.Contains(Char))
-                    return false;
+                var FoundRow = OldRows.FirstOrDefault(x => x.RowId == RowData.RowId); // Ищем в старом переводе строки ID
+
+                if (FoundRow == null) // Если их нет, то значит это новые строки
+                {
+                    Result.Add(RowData); // добавляем в список.
+                }
+                else
+                {
+                    if (!string.Equals(RowData.OriginalText, FoundRow.OriginalText, CompareType)) // Сравниваем оригинальные тексты.
+                    {
+                        Result.Add(RowData); // Если отличаются, то добавляем.
+                    }
+                }
             }
-            return true;
+            return Result;
         }
 
         public static bool IsNumber(string Input)
@@ -1001,7 +1028,7 @@ namespace WarbandParser
         }
 
         /// <summary>
-        /// Функция возвращает только строковые параметры, численные значение, знаковые не обрабатываются.
+        /// Функция возвращает только строковые параметры, численные и знаковые значения не обрабатываются..
         /// </summary>
         /// <param name="Data"></param>
         /// <param name="Prefix"></param>
@@ -1042,7 +1069,7 @@ namespace WarbandParser
                         FoundedPrefix = true;
                     }
                 }
-                else if (Regex.IsMatch(Line, @"^[^\p{L}]*$")) // Если одни знаки и цифры.
+                else if (RegSymbolsAndNumbers.IsMatch(Line)) // Если одни знаки и цифры.
                 {
                     if (TextStartWithError(Line))
                     {
@@ -1053,7 +1080,7 @@ namespace WarbandParser
 
                     continue;
                 }
-                else if (Regex.IsMatch(Line, @"^(?=.*\p{L})[\p{L}\p{N}\p{P}\p{S}]+$")) // Если в строке есть юникод-буквы и знаки.
+                else if (RegWordsAndSymbols.IsMatch(Line)) // Если в строке есть юникод-буквы и знаки.
                 {
                     Result.Add(Line);
 

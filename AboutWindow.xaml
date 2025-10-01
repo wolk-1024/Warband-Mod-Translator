@@ -8,6 +8,6 @@
         Title="О программе" Height="250" Width="350">
     <Grid>
         <Button x:Name="ButtonAboutOk" Content="Ясно" HorizontalAlignment="Center" Margin="0,165,0,0" Width="60" FontSize="14" Height="30" VerticalAlignment="Top" Click="ButtonAboutOk_Click"/>
-
+        
     </Grid>
 </Window>

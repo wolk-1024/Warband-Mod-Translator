@@ -8,7 +8,7 @@
         Title="Настройки" Height="300" Width="300">
     <Grid>
         <CheckBox x:Name="ShowID" Content="Показать столбец ID" HorizontalAlignment="Left" Margin="15,45,0,0" VerticalAlignment="Top" Width="151" Checked="ShowID_Checked" IsChecked="False"/>
-        <CheckBox x:Name="FreeExport" Content="Замена строк при экспорте" HorizontalAlignment="Left" Margin="15,75,0,0" VerticalAlignment="Top" Width="201"/>
+        <CheckBox x:Name="FreeExport" Content="Замена пустых строк при экспорте" HorizontalAlignment="Left" Margin="15,75,0,0" VerticalAlignment="Top" Width="220"/>
         <CheckBox x:Name="ImportLog" Content="Запись неудачного импорта" HorizontalAlignment="Left" Margin="15,105,0,0" VerticalAlignment="Top" Width="185" IsChecked="True"/>
 
     </Grid>

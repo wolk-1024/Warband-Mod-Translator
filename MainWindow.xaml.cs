@@ -9,6 +9,7 @@
  *  Добавить больше горячих клавиш для поиска.
  */
 using Microsoft.Win32;
+using ModTranslatorSettings;
 using System.IO;
 using System.Reflection;
 using System.Text;
@@ -17,9 +18,8 @@ using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
 
-using WarbandSearch;
-using ModTranslatorSettings;
 using WarbandAbout;
+using WarbandSearch;
 using static WarbandParser.Parser;
 
 //#nullable disable
@@ -45,6 +45,11 @@ namespace ModTranslator
         public string g_ModFolderPath = string.Empty;
 
         /// <summary>
+        /// Теущий обрабатываемый файл.
+        /// </summary>
+        public string g_CurrentOriginalFile = string.Empty;
+
+        /// <summary>
         /// // Путь к .csv переводу.
         /// </summary>
         public string g_FileForExport = string.Empty;
@@ -63,6 +68,11 @@ namespace ModTranslator
         /// Тут все данные для биндинга с таблицей. Id, текст, перевод.
         /// </summary>
         private List<ModTextRow> g_CurrentMainGridData = new List<ModTextRow>();
+
+        /// <summary>
+        /// 
+        /// </summary>
+        //public bool g_CompareMode = false;
 
         //private List<CollectionTextData> g_CollectionTextData = new List<CollectionTextData>(); //
 
@@ -230,7 +240,7 @@ namespace ModTranslator
                 g_CurrentCellValue = string.Empty;
 
                 MainDataGrid.ItemsSource = null;
-                    ;
+
                 MainDataGrid.Items.Refresh();
 
                 g_CurrentMainGridData.Clear();
@@ -278,108 +288,121 @@ namespace ModTranslator
             }
         }
 
-        private bool ProcessOriginalFiles(string FilePath)
+        private List<ModTextRow>? ProcessOriginalFiles(string FilePath)
         {
+            if (!File.Exists(FilePath))
+                return null;
+
+            List<ModTextRow>? Result = null;
+
             try
             {
-                UnloadTableTextData(); // Очищаем таблицу.
-
-                List<ModTextRow>? Result = null;
-
                 var FileName = Path.GetFileName(FilePath);
 
                 switch (FileName)
                 {
                     case "conversation.txt":
-
-                        Result = LoadAndParseConversationFile(FilePath);
-                        break;
-
+                        {
+                            Result = LoadAndParseConversationFile(FilePath);
+                            break;
+                        }
                     case "factions.txt":
-
-                        Result = LoadAndParseFactionsFile(FilePath);
-                        break;
-
+                        {
+                            Result = LoadAndParseFactionsFile(FilePath);
+                            break;
+                        }
                     case "info_pages.txt":
-
-                        Result = LoadAndParseInfoPagesFile(FilePath);
-                        break;
-
+                        {
+                            Result = LoadAndParseInfoPagesFile(FilePath);
+                            break;
+                        }
                     case "item_kinds1.txt":
-
-                        Result = LoadAndParseItemKindsFile(FilePath);
-                        break;
-
-                    case "item_modifiers.txt":
-
-                        Result = LoadAndParseItemModifiersFile(FilePath);
-                        break;
-
+                        {
+                            Result = LoadAndParseItemKindsFile(FilePath);
+                            break;
+                        }
+                    case "item_modifiers.txt": // Этого файла часто не бывает в модах.
+                        {
+                            Result = LoadAndParseItemModifiersFile(FilePath);
+                            break;
+                        }
                     case "menus.txt":
-
-                        Result = LoadAndParseMenuFile(FilePath);
-                        break;
-
+                        {
+                            Result = LoadAndParseMenuFile(FilePath);
+                            break;
+                        }
                     case "parties.txt":
-
-                        Result = LoadAndParsePartiesFile(FilePath);
-                        break;
-
+                        {
+                            Result = LoadAndParsePartiesFile(FilePath);
+                            break;
+                        }
                     case "party_templates.txt":
-
-                        Result = LoadAndParsePartyTemplatesFile(FilePath);
-                        break;
-
+                        {
+                            Result = LoadAndParsePartyTemplatesFile(FilePath);
+                            break;
+                        }
                     case "quests.txt":
-
-                        Result = LoadAndParseQuestsFile(FilePath);
-                        break;
-
+                        {
+                            Result = LoadAndParseQuestsFile(FilePath);
+                            break;
+                        }
                     case "quick_strings.txt":
-
-                        Result = LoadAndParseQuickStringsFile(FilePath);
-                        break;
-
+                        {
+                            Result = LoadAndParseQuickStringsFile(FilePath);
+                            break;
+                        }
                     case "skills.txt":
-
-                        Result = LoadAndParseSkillsFile(FilePath);
-                        break;
-
+                        {
+                            Result = LoadAndParseSkillsFile(FilePath);
+                            break;
+                        }
                     case "skins.txt":
-
-                        Result = LoadAndParseSkinsFile(FilePath);
-                        break;
-
+                        {
+                            Result = LoadAndParseSkinsFile(FilePath);
+                            break;
+                        }
                     case "strings.txt":
-
-                        Result = LoadAndParseStringsFile(FilePath);
-                        break;
-
+                        {
+                            Result = LoadAndParseStringsFile(FilePath);
+                            break;
+                        }
                     case "troops.txt":
-
-                        Result = LoadAndParseTroopsFile(FilePath);
-                        break;
-                }
-                SetTranslateCountLabel();
-
-                if (Result != null)
-                {
-                    UpdateTableTextData(Result);
-
-                    return true;
+                        {
+                            Result = LoadAndParseTroopsFile(FilePath);
+                            break;
+                        }
                 }
             }
             catch (Exception)
             {
                 MessageBox.Show($"При обработке: {FilePath} произошла критическая ошибка.", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Stop);
 
-                UnloadTableTextData();
+                return null;
+            }
+            return Result;
+        }
 
+        private bool ProcessAndLoadOriginalFiles(string FilePath)
+        {
+            if (!File.Exists(FilePath))
                 return false;
+
+            var LoadedData = ProcessOriginalFiles(FilePath);
+
+            if (LoadedData != null)
+            {
+                UnloadTableTextData(); // Очищаем таблицу.
+
+                UpdateTableTextData(LoadedData);
+
+                SetTranslateCountLabel();
+
+                return true;
             }
             return false;
         }
 
+        // Fixme: Вызывает срабатывание SelectFilesBox_SelectionChanged
         private int LoadOriginalFilesToFileBox(string FolderPath)
         {
             var Result = 0;
@@ -403,7 +426,7 @@ namespace ModTranslator
             }
             if (Result > 0)
             {
-                SelectFilesBox.ItemsSource = NewFilesList; // Херня вызывает срабатывание SelectionChanged как итог файл может грузиться более 1 раза. Надо костыль городить.
+                SelectFilesBox.ItemsSource = NewFilesList; // Херня вызывает срабатывание SelectFilesBox_SelectionChanged как итог файл может грузиться более 1 раза. Надо костыль городить.
 
                 g_IndexSelectedFile = 0;
 
@@ -488,8 +511,10 @@ namespace ModTranslator
                 {
                     string FilePath = g_ModFolderPath + "\\" + g_BindingsFileNames[SelectedElement].OriginalFile;
 
-                    if (ProcessOriginalFiles(FilePath))
+                    if (ProcessAndLoadOriginalFiles(FilePath))
                     {
+                        g_CurrentOriginalFile = FilePath;
+
                         SetTranslateCountLabel();
 
                         return true;
@@ -524,9 +549,7 @@ namespace ModTranslator
                     else
                         Result.FailedLoad.Add(Data); // В файле-переводе и оригинале нет совпадения ID. (Вероятно, импортируемый файл может быть старой версией перевода)
                 }
-                MainDataGrid.ItemsSource = g_CurrentMainGridData;
-
-                MainDataGrid.Items.Refresh();
+                UpdateTableTextData(g_CurrentMainGridData);
             }
             return Result;
         }
@@ -853,8 +876,10 @@ namespace ModTranslator
 
                 DataTextChangedMessage();
 
-                if (ProcessOriginalFiles(FilePath))
+                if (ProcessAndLoadOriginalFiles(FilePath))
                 {
+                    g_CurrentOriginalFile = FilePath;
+
                     FocusFirstRow();
 
                     EnableControlButtons();
@@ -871,6 +896,8 @@ namespace ModTranslator
 
             //FolderDialog.InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
 
+            FolderDialog.Title = "Выбрать папку с установленным модом";
+
             if (FolderDialog.ShowDialog() == true)
             {
                 g_ModFolderPath = FolderDialog.FolderName;
@@ -879,7 +906,7 @@ namespace ModTranslator
 
                 SelectFilesBox.IsEnabled = true;
 
-                if (LoadOriginalFilesToFileBox(FolderDialog.FolderName) > 0)
+                if (LoadOriginalFilesToFileBox(FolderDialog.FolderName) > 0) // Fixme: Вызывает срабатывание SelectFilesBox_SelectionChanged
                 {
                     if (LoadFileBoxItemByIndex(0))
                     {
@@ -973,6 +1000,8 @@ namespace ModTranslator
         {
             if (e.Key == Key.S && Keyboard.Modifiers == ModifierKeys.Control) // Ctrl + S
             {
+                e.Handled = true;
+
                 g_DataHasBeenChanged = false;
 
                 if (string.IsNullOrEmpty(g_FileForExport) && IsLoadedTextData())
@@ -993,24 +1022,88 @@ namespace ModTranslator
 
             if (e.Key == Key.Z && Keyboard.Modifiers == ModifierKeys.Control) // Ctrl + Z
             {
-                //
+                //e.Handled = true;
             }
 
             if (e.Key == Key.F && Keyboard.Modifiers == ModifierKeys.Control) // Ctrl + F
             {
-                g_SearchWindow.Show();
+                e.Handled = true;
+
+                g_SearchWindow.Show(); // Окно поиска.
 
                 g_SearchWindow.Owner = this;
             }
 
-            if (e.Key == Key.F3) // F3
+            if (e.Key == Key.F3)
             {
-                //g_SearchWindow.SearchCellByValueNext(g_SearchWindow.SearchTextBox.Text);
+                //e.Handled = true;
             }
 
             if (e.Key == Key.F3 && Keyboard.Modifiers == ModifierKeys.Shift) // Shift + F3
             {
-                //g_SearchWindow.SearchCellByValuePrev(g_SearchWindow.SearchTextBox.Text);
+                //e.Handled = true;
+            }
+
+            if (e.Key == Key.F && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift)) // Ctrl + Shift + F
+            {
+                e.Handled = true;
+
+                DataTextChangedMessage();
+
+                ChooseModAndSeeDifference();
+            }
+        }
+
+        private void ChooseModAndSeeDifference()
+        {
+            if (!IsLoadedTextData())
+                return;
+
+            var FolderDialog = new OpenFolderDialog();
+
+            FolderDialog.Title = "Выбрать папку со старой версией мода";
+
+            FolderDialog.Multiselect = false;
+
+            if (!string.IsNullOrEmpty(g_ModFolderPath))
+                FolderDialog.InitialDirectory = g_ModFolderPath;
+
+            if (FolderDialog.ShowDialog() == true)
+            {
+                var TargetFile = FolderDialog.FolderName + "\\" + Path.GetFileName(g_CurrentOriginalFile);
+
+                if (!File.Exists(TargetFile))
+                {
+                    MessageBox.Show($"Не найден файл {TargetFile}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+
+                    return;
+                }
+
+                var LoadedData = ProcessOriginalFiles(TargetFile);
+
+                if (LoadedData == null)
+                {
+                    MessageBox.Show($"Неверный мод {FolderDialog.FolderName}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+
+                    return;
+                }
+
+                var ModChanges = GetModTextChanges(g_CurrentMainGridData, LoadedData);
+
+                if (ModChanges.Count == 0)
+                {
+                    MessageBox.Show($"Разницы нет", "Сравнение", MessageBoxButton.OK, MessageBoxImage.Information);
+
+                    return;
+                }
+
+                UnloadTableTextData();
+
+                UpdateTableTextData(ModChanges);
+
+                SetTranslateCountLabel();
+
+                g_DataHasBeenChanged = true;
             }
         }
 
@@ -1091,7 +1184,7 @@ namespace ModTranslator
                 if (ModText == null)
                     return -1;
 
-                if (ModText.TranslatedText == "")
+                if (ModText.TranslatedText == string.Empty)
                 {
                     FocusCell(MainDataGrid, NextIndex, ColumnIndex);
 
@@ -1130,7 +1223,7 @@ namespace ModTranslator
                     if (ModText == null)
                         return -1;
 
-                    if (ModText.TranslatedText == "")
+                    if (ModText.TranslatedText == string.Empty)
                     {
                         FocusCell(MainDataGrid, PrevIndex, ColumnIndex);
 
