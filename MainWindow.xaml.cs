@@ -267,16 +267,19 @@ namespace ModTranslator
 
                 foreach (string Line in FileLines)
                 {
-                    var SplitLine = Line.Split('|', StringSplitOptions.RemoveEmptyEntries);
-
-                    if (SplitLine.Length > 1)
+                    if (IsLineStartsWithPrefix(Line))
                     {
-                        Result.Add(
-                            new ModTextRow
-                            {
-                                RowId = SplitLine[0],
-                                TranslatedText = SplitLine[1]
-                            });
+                        var SplitLine = Line.Split('|', StringSplitOptions.RemoveEmptyEntries);
+
+                        if (SplitLine.Length > 1)
+                        {
+                            Result.Add(
+                                new ModTextRow
+                                {
+                                    RowId = SplitLine[0],
+                                    TranslatedText = SplitLine[1]
+                                });
+                        }
                     }
                 }
                 return Result;

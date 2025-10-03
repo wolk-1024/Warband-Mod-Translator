@@ -123,9 +123,12 @@ namespace WarbandParser
                 return false;
 
             if (!string.IsNullOrEmpty(Input))
-                return Input.StartsWith("{!}", StringComparison.OrdinalIgnoreCase);
-            else
-                return false;
+            {
+                var Result = Input.TrimStart(); // Иногда блок стоит не в самом конце, а его разделяют пробелы.
+
+                return Result.StartsWith("{!}", StringComparison.OrdinalIgnoreCase);
+            }
+            return false;
         }
 
         static string RemoveWordFromStart(string Input, string WordToRemove)
