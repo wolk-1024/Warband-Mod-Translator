@@ -1,5 +1,5 @@
 ﻿/*
- *  Парсер v29.09.2025
+ *  Парсер v01.10.2025
  *  
  *  Известные проблемы: 
  *  
@@ -29,7 +29,7 @@ namespace WarbandParser
         private static readonly Regex RegWordsAndSymbols = new Regex(@"^(?=.*\p{L})[\p{L}\p{N}\p{P}\p{S}]+$", RegexOptions.Compiled);
 
         /// <summary>
-        /// Глобалка для игнорирования {!} в строках. Не трогать.
+        /// Игнорирование {!} в строках. Не трогать.
         /// </summary>
         public static bool g_IgnoreBlockingSymbol = false;
 
@@ -128,13 +128,24 @@ namespace WarbandParser
                 return false;
         }
 
+        static string RemoveWordFromStart(string Input, string WordToRemove)
+        {
+            if (string.IsNullOrEmpty(Input) || string.IsNullOrEmpty(WordToRemove))
+                return Input;
+
+            if (Input.StartsWith(WordToRemove))
+                return Input.Substring(WordToRemove.Length);
+            else
+                return Input;
+        }
+
         public static List<ModTextRow> RemoveDuplicateIDs(List<ModTextRow> Data, out int DuplicatesRemoved)
         {
-            var GroupedData = Data.GroupBy(x => x.RowId);
+            DuplicatesRemoved = 0;
 
             var Result = new List<ModTextRow>();
 
-            DuplicatesRemoved = 0;
+            var GroupedData = Data.GroupBy(x => x.RowId);
 
             foreach (var Group in GroupedData)
             {
@@ -150,7 +161,6 @@ namespace WarbandParser
                 }
                 Result.Add(PreferredItem);
             }
-
             return Result;
         }
 
@@ -327,15 +337,14 @@ namespace WarbandParser
 
                     string OriginalText = FacArgs[1].Replace("_", " ");
 
-                    if (!TextStartWithError(OriginalText))
-                    {
-                        ModTextResult.Add(
-                            new ModTextRow
-                            {
-                                RowId = LineID,
-                                OriginalText = OriginalText
-                            });
-                    }
+                    OriginalText = RemoveWordFromStart(OriginalText, "{!}"); // Игра вроде как игнорирует блок.символ в фракциях. Поэтому удаляем.
+
+                    ModTextResult.Add(
+                        new ModTextRow
+                        {
+                            RowId = LineID,
+                            OriginalText = OriginalText
+                        });
                 }
                 int RemovedIds;
 
@@ -797,6 +806,8 @@ namespace WarbandParser
                     string SkillDescription = SkillArgs[2].Replace("_", " ");
 
                     string NewID = OldID + "_desc";
+
+                    // Нужны проверки на блок?
 
                     ModTextResult.Add(
                         new ModTextRow

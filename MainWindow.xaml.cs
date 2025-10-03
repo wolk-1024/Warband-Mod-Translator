@@ -605,7 +605,7 @@ namespace ModTranslator
                     {
                         string NewLine = TextData.RowId + "|" + TranslatedData;
 
-                        WriteText.WriteLine(NewLine);
+                        WriteText.WriteLine(NewLine.TrimEnd());
                     }
                 }
             }
