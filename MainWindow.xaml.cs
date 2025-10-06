@@ -9,16 +9,12 @@
  *  Добавить работу с несколькими категориями одновременно, без перезагрузки таблицы.
  *  Добавить больше горячих клавиш для поиска.
  */
-using CsvHelper;
-using CsvHelper.Configuration;
 using Microsoft.Win32;
 using ModTranslatorSettings;
-using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
-using System.Text.Json.Serialization.Metadata;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -85,6 +81,16 @@ namespace ModTranslator
         /// Для Google Sheets [',']
         /// </summary>
         public char[] g_CsvFileSeparators = { '|', ',' };
+
+        /// <summary>
+        /// Глобалка со списком замен знаков, которые искаженно отображаются в игре.
+        /// </summary>
+        private readonly Dictionary<char, char> g_TextForbiddenChars = new Dictionary<char, char>
+        {
+            { '—', '-' },
+            //{ 'ё', 'е' },
+            //{ 'Ё', 'Е' }
+        };
 
         //private List<CollectionTextData> g_CollectionTextData = new List<CollectionTextData>(); //
 
@@ -799,6 +805,14 @@ namespace ModTranslator
             SetTranslateCountLabel(HowManyTranslatedLines(), g_CurrentMainGridData.Count);
         }
 
+        public string ReplaceForbiddenChars(string Input)
+        {
+            if (string.IsNullOrEmpty(Input))
+                return Input;
+
+            return new string(Input.Select(c => g_TextForbiddenChars.GetValueOrDefault(c, c)).ToArray());
+        }
+
         private void ExportModTextToFile(string FilePath)
         {
             bool WriteDummy = false;
@@ -826,7 +840,9 @@ namespace ModTranslator
 
                     if (!string.IsNullOrEmpty(TranslatedData)) // Не записываем в файл поля без перевода.
                     {
-                        string NewLine = TextData.RowId + "|" + TranslatedData;
+                        var ResultTranlatedText = ReplaceForbiddenChars(TranslatedData);
+
+                        string NewLine = TextData.RowId + "|" + ResultTranlatedText;
 
                         WriteText.WriteLine(NewLine.TrimEnd());
                     }
