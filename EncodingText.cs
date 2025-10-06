@@ -4,119 +4,206 @@
 using System.IO;
 using System.Text;
 
-static class EncodingTextFile
+namespace EncodingTextFile
 {
-    private static bool IsAscii(char Char)
+    public static class EncodingText
     {
-        return Char >= 0 && Char <= 127;
-    }
-
-    private static bool IsUnicodeChar(char Char)
-    {
-        return !char.IsSurrogate(Char);
-    }
-
-    public static bool TextContainsReplacementChar(string TextData)
-    {
-        return TextData.Any(c => c == 0xFFFD);
-    }
-
-    public static int DetectEncoding(byte[] TextBytes)
-    {
-        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-
-        if (IsUtf8WithBom(TextBytes))
-            return 65001;
-
-        if (IsUtf8WithoutBom(TextBytes))
-            return 65001;
-
-        if (IsWindows1251(TextBytes))
-            return 1251;
-
-        return -1;
-    }
-
-    private static bool IsUtf8WithoutBom(byte[] TextBytes)
-    {
-        try
+        static bool IsAscii(char Char)
         {
-            Encoding UTF8 = new UTF8Encoding(false, true);
-
-            string Decoded = UTF8.GetString(TextBytes);
-
-            return true;
+            return Char >= 0 && Char <= 127;
         }
-        catch
+
+        static bool IsUnicodeChar(char Char)
         {
-            return false;
+            return !char.IsSurrogate(Char);
         }
-    }
 
-    private static bool IsWindows1251(byte[] TextData)
-    {
-        try
-        {
-            Encoding Encoding1251 = Encoding.GetEncoding(1251);
-
-            string DecodedText = Encoding1251.GetString(TextData);
-
-            return true;
-        }
-        catch
-        {
-            return false;
-        }
-    }
-
-    private static bool IsUtf8WithBom(byte[] Bytes)
-    {
-        return Bytes.Length >= 3 &&
-            Bytes[0] == 0xEF &&
-            Bytes[1] == 0xBB &&
-            Bytes[2] == 0xBF;
-    }
-
-    public static bool IsValidEncode(byte[] ByteText, Encoding Code)
-    {
-        try
-        {
-            var Text = Code.GetString(ByteText);
-
-            return Code.GetBytes(Text).SequenceEqual(ByteText);
-        }
-        catch
-        {
-            return false;
-        }
-    }
-
-    public static string ReadTextFileAndConvertTo(string FilePath, Encoding ConvertTo)
-    {
-        var Buffer = File.ReadAllBytes(FilePath);
-
-        if (Buffer.Length > 0)
+        public static Encoding? DetectEncoding(byte[] Data)
         {
             Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 
-            var EncodingPage = DetectEncoding(Buffer);
+            if (Data == null || Data.Length == 0)
+                return null;
 
-            if (EncodingPage != -1)
+            var BomEncoding = DetectEncodingFromBom(Data);
+
+            if (BomEncoding != null)
+                return BomEncoding;
+
+            if (IsValidUtf8(Data))
+                return Encoding.UTF8;
+
+            if (IsValidEncoding(Data, 1251))
+                return Encoding.GetEncoding(1251);
+
+            if (IsValidEncoding(Data, 28591))
+                return Encoding.GetEncoding(28591);
+
+            if (IsValidAscii(Data))
+                return Encoding.ASCII;
+
+            return null;
+        }
+
+        private static Encoding? DetectEncodingFromBom(byte[] Bytes)
+        {
+            if (Bytes == null || Bytes.Length < 2)
+                return null;
+
+            if (Bytes.Length >= 3 && Bytes[0] == 0xEF && Bytes[1] == 0xBB && Bytes[2] == 0xBF)
             {
-                var Encode = Encoding.GetEncoding(EncodingPage);
+                return Encoding.UTF8;
+            }
 
-                var Result = Encoding.Convert(Encode, Encoding.Unicode, Buffer);
+            if (Bytes.Length >= 2 && Bytes[0] == 0xFE && Bytes[1] == 0xFF)
+            {
+                return Encoding.BigEndianUnicode; // UTF-16 Big Endian
+            }
 
-                return ConvertTo.GetString(Result);
+            if (Bytes.Length >= 2 && Bytes[0] == 0xFF && Bytes[1] == 0xFE)
+            {
+                if (Bytes.Length >= 4 && Bytes[2] == 0x00 && Bytes[3] == 0x00) // Проверяем, не UTF-32 Little Endian ли это
+                {
+                    return Encoding.UTF32;
+                }
+                return Encoding.Unicode; // UTF-16 Little Endian
+            }
+
+            if (Bytes.Length >= 4 && Bytes[0] == 0x00 && Bytes[1] == 0x00 && Bytes[2] == 0xFE && Bytes[3] == 0xFF)
+            {
+                return new UTF32Encoding(true, true); // UTF-32 Big Endian
+            }
+
+            return null;
+        }
+
+        // Бом настолько полезен, что его приходится удалять, чтоб не искажал текст при конвертации.
+        private static byte[] DeleteBom(byte[] Data, out bool Deleted)
+        {
+            Deleted = false;
+
+            var Encode = DetectEncodingFromBom(Data);
+
+            if (Encode != null)
+            {
+                byte[] Bom = Encode.GetPreamble();
+
+                if (Bom.Length > 0)
+                {
+                    Deleted = false;
+
+                    return Data.AsSpan(Bom.Length).ToArray();
+                }
+            }
+            return Data;
+        }
+
+        private static bool IsValidAscii(byte[] Data)
+        {
+            foreach (byte Char in Data)
+            {
+                if (!IsAscii((char)Char))
+                    return false;
+            }
+            return true;
+        }
+
+        private static bool IsValidUtf8(byte[] Data)
+        {
+            try
+            {
+                var Utf8 = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
+
+                Utf8.GetString(Data);
+
+                return true;
+            }
+            catch
+            {
+                return false;
             }
         }
-        return string.Empty;
-    }
 
-    public static int GetTextFileEncoding(string FilePath)
-    {
-        //
-        return -1;
-    }
+        private static bool IsValidEncoding(byte[] Data, int CodePage)
+        {
+            try
+            {
+                var Result = Encoding.GetEncoding(CodePage, EncoderFallback.ExceptionFallback, DecoderFallback.ExceptionFallback);
 
+                Result.GetString(Data);
+
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static bool IsValidEncoding(byte[] Data, string CodePageName)
+        {
+            try
+            {
+                var Encode = Encoding.GetEncoding(CodePageName);
+
+                if (Encode != null)
+                    return IsValidEncoding(Data, Encode.CodePage);
+                else
+                    return false;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /*
+        public static bool IsValidEncode(byte[] ByteText, Encoding Code)
+        {
+            try
+            {
+                var Text = Code.GetString(ByteText);
+
+                return Code.GetBytes(Text).SequenceEqual(ByteText);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+        */
+
+        public static string ReadTextFileAndConvertTo(string FilePath, Encoding ConvertTo)
+        {
+            try
+            {
+                Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+
+                var Buffer = File.ReadAllBytes(FilePath);
+
+                if (Buffer.Length > 0)
+                {
+                    var EncodingPage = DetectEncoding(Buffer);
+
+                    if (EncodingPage != null)
+                    {
+                        var Result = Encoding.Convert(EncodingPage, ConvertTo, DeleteBom(Buffer, out _));
+
+                        return ConvertTo.GetString(Result);
+                    }
+                }
+            }
+            catch
+            {
+                return string.Empty;
+            }
+            return string.Empty;
+        }
+
+        public static Encoding? GetTextFileEncoding(string FilePath)
+        {
+            return null;
+        }
+
+    }
 }

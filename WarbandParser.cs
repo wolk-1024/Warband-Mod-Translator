@@ -14,6 +14,8 @@ using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
 
+using EncodingTextFile;
+
 namespace WarbandParser
 {
     public static class Parser
@@ -244,7 +246,7 @@ namespace WarbandParser
 
             if (File.Exists(FilePath))
             {
-                string TextData = EncodingTextFile.ReadTextFileAndConvertTo(FilePath, Encoding.Unicode);
+                string TextData = EncodingText.ReadTextFileAndConvertTo(FilePath, Encoding.Unicode);
 
                 //string TextData = File.ReadAllText(FilePath, Encoding.UTF8);
 
