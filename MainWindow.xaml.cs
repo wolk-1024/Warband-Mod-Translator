@@ -9,16 +9,20 @@
  *  Добавить работу с несколькими категориями одновременно, без перезагрузки таблицы.
  *  Добавить больше горячих клавиш для поиска.
  */
+using CsvHelper;
+using CsvHelper.Configuration;
 using Microsoft.Win32;
 using ModTranslatorSettings;
+using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Text;
+using System.Text.Json.Serialization.Metadata;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
-
 using WarbandAbout;
 using WarbandSearch;
 using static WarbandParser.Parser;
@@ -74,6 +78,13 @@ namespace ModTranslator
         /// Режим сравнения версий.
         /// </summary>
         public bool g_CompareMode = false;
+
+        /// <summary>
+        /// Допустимые разделители в csv файлах.
+        /// Для Warband ['|']
+        /// Для Google Sheets [',']
+        /// </summary>
+        public char[] g_CsvFileSeparators = { '|', ',' };
 
         //private List<CollectionTextData> g_CollectionTextData = new List<CollectionTextData>(); //
 
@@ -257,6 +268,217 @@ namespace ModTranslator
             MainDataGrid.Items.Refresh();
         }
 
+        private static int CountFieldsOutsideQuotes(string TextLine, char Separator)
+        {
+            bool InQuotes = false;
+
+            int Result = 1;
+
+            for (int i = 0; i < TextLine.Length; i++)
+            {
+                char Char = TextLine[i];
+
+                if (Char == '"')
+                {
+                    if (i + 1 < TextLine.Length && TextLine[i + 1] == '"')
+                        i++; // Пропустить экранированную кавычку
+                    else
+                        InQuotes = !InQuotes;
+                }
+                else if (Char == Separator && !InQuotes)
+                {
+                    Result++;
+                }
+            }
+            return Result;
+        }
+
+        public static List<string> ParseCsvLine(string TextLine, char Separator)
+        {
+            var Result = new List<string>();
+
+            bool inQuotes = false;
+
+            var CurrentField = "";
+
+            for (int i = 0; i < TextLine.Length; i++)
+            {
+                char Char = TextLine[i];
+
+                if (Char == '"')
+                {
+                    if (i + 1 < TextLine.Length && TextLine[i + 1] == '"')
+                    {
+                        CurrentField += '"';
+
+                        i++;
+                    }
+                    else
+                        inQuotes = !inQuotes;
+                }
+                else if (Char == Separator && !inQuotes)
+                {
+                    Result.Add(CurrentField);
+
+                    CurrentField = "";
+                }
+                else
+                    CurrentField += Char;
+            }
+            Result.Add(CurrentField);
+
+            return Result;
+        }
+
+        static char? DetectCsvLineSeparator(string TextLine, char[] CandidateSeparators)
+        {
+            if (string.IsNullOrEmpty(TextLine) || CandidateSeparators == null || CandidateSeparators.Length == 0)
+                return null;
+
+            char? Result = null;
+
+            int MaxIndex = TextLine.Length;
+
+            foreach (char Sep in CandidateSeparators)
+            {
+                int Index = TextLine.IndexOf(Sep);
+
+                if (Index >= 0 && Index < MaxIndex)
+                {
+                    var CountFilds = CountFieldsOutsideQuotes(TextLine, Sep);
+
+                    if (CountFilds >= 2)
+                    {
+                        MaxIndex = Index;
+
+                        Result = Sep;
+                    }
+                }
+            }
+            return Result;
+        }
+
+        static char? DetectCsvFileSeparator(string FilePath, char[] CandidateSeparators, int SampleLines)
+        {
+            if (!File.Exists(FilePath) || CandidateSeparators.Length == 0)
+                return null;
+
+            int FoundCount = 0;
+
+            var Result = new List<char> { };
+
+            foreach (string Line in File.ReadLines(FilePath))
+            {
+                if (FoundCount >= SampleLines)
+                    break;
+
+                string Cleaned = new string(Line.Where(c => !char.IsControl(c)).ToArray()).Trim(); // Убираем переносы и пробелы из строки.
+
+                if (!string.IsNullOrEmpty(Cleaned))
+                {
+                    var CsvSeparator = DetectCsvLineSeparator(Line, CandidateSeparators);
+
+                    if (CsvSeparator == null)
+                        return null;
+
+                    Result.Add((char)CsvSeparator);
+
+                    FoundCount++;
+                }
+            }
+            return Result.Distinct().Count() == 1 ? Result[0] : null;
+        }
+
+
+        public static List<ModTextRow> ReadModTextCsvFile(string FilePath, char[] Separators, int MaxArgs = 3)
+        {
+            var Result = new List<ModTextRow>();
+
+            if (!File.Exists(FilePath))
+                return Result;
+
+            var CsvSeparator = DetectCsvFileSeparator(FilePath, Separators, 5); // Допустимые разделители в csv
+
+            if (CsvSeparator == null)
+                return Result;
+
+            var AllLines = File.ReadAllLines(FilePath, Encoding.UTF8);
+
+            if (AllLines.Length == 0)
+                return Result;
+
+            foreach (var CurrentLine in AllLines)
+            {
+                if (string.IsNullOrWhiteSpace(CurrentLine))
+                    continue; // Пропускаем пустые строки, если они есть.
+
+                var LineArgs = ParseCsvLine(CurrentLine, (char)CsvSeparator);
+
+                if (LineArgs.Count <= 1 || LineArgs.Count > MaxArgs) // Параметров не должно быть больше MaxArgs, если больше, то явная ошибка.
+                {
+                    Result.Clear();
+
+                    return Result;
+                }
+
+                Result.Add(new ModTextRow
+                {
+                    RowId = LineArgs[0],
+                    TranslatedText = LineArgs[1]
+                });
+            }
+            return Result;
+        }
+
+        /*
+        public class TranslationRecordMap : ClassMap<ModTextRow>
+        {
+            public TranslationRecordMap()
+            {
+                Map(m => m.RowId).Index(0);
+
+                Map(m => m.TranslatedText).Index(1);
+
+                Map(m => m.OriginalText).Index(2).Optional();
+            }
+        }
+
+        public static List<ModTextRow> ReadCsvFile(string FilePath)
+        {
+            try
+            {
+                var Separator = DetectCsvFileSeparator(FilePath).ToString();
+
+                if (Separator != null)
+                {
+                    using (var FileReader = new StreamReader(FilePath))
+                    {
+                        var CsvConfig = new CsvConfiguration(CultureInfo.InvariantCulture);
+
+                        CsvConfig.Delimiter = Separator;
+
+                        CsvConfig.HasHeaderRecord = false;
+
+                        CsvConfig.MissingFieldFound = null;
+
+                        CsvConfig.BadDataFound = null;
+
+                        using (var Csv = new CsvHelper.CsvReader(FileReader, CsvConfig))
+                        {
+                            Csv.Context.RegisterClassMap<TranslationRecordMap>();
+
+                            return Csv.GetRecords<ModTextRow>().ToList();
+                        }
+                    }
+                }
+                return new List<ModTextRow>();
+            }
+            catch (Exception)
+            {
+                return new List<ModTextRow>();
+            }
+        }
+
         public static List<ModTextRow> ReadCsvFile(string FileName)
         {
             var Result = new List<ModTextRow>();
@@ -267,19 +489,16 @@ namespace ModTranslator
 
                 foreach (string Line in FileLines)
                 {
-                    if (IsLineStartsWithPrefix(Line))
-                    {
-                        var SplitLine = Line.Split('|', StringSplitOptions.RemoveEmptyEntries);
+                    var SplitLine = Line.Split('|', StringSplitOptions.RemoveEmptyEntries);
 
-                        if (SplitLine.Length > 1)
-                        {
-                            Result.Add(
-                                new ModTextRow
-                                {
-                                    RowId = SplitLine[0],
-                                    TranslatedText = SplitLine[1]
-                                });
-                        }
+                    if (SplitLine.Length > 1)
+                    {
+                        Result.Add(
+                            new ModTextRow
+                            {
+                                RowId = SplitLine[0],
+                                TranslatedText = SplitLine[1]
+                            });
                     }
                 }
                 return Result;
@@ -289,6 +508,7 @@ namespace ModTranslator
                 return Result;
             }
         }
+        */
 
         private List<ModTextRow>? ProcessOriginalFiles(string FilePath)
         {
@@ -526,9 +746,9 @@ namespace ModTranslator
 
         private TextImportInfo ImportTranslate(string FilePath)
         {
-            var Result = new TextImportInfo { SuccessLoaded = 0 }; 
+            var Result = new TextImportInfo { SuccessLoaded = 0 };
 
-            var TranslateData = ReadCsvFile(FilePath);
+            var TranslateData = ReadModTextCsvFile(FilePath, g_CsvFileSeparators, 3);
 
             if (TranslateData.Count >= 1)
             {
