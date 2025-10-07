@@ -12,6 +12,7 @@
 using Microsoft.Win32;
 using ModTranslatorSettings;
 using System.ComponentModel;
+using System.Data.Common;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -21,6 +22,7 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Input;
+using System.Windows.Media;
 using WarbandAbout;
 using WarbandSearch;
 using static WarbandParser.Parser;
@@ -89,7 +91,7 @@ namespace ModTranslator
         /// </summary>
         private readonly Dictionary<char, char> g_TextForbiddenChars = new Dictionary<char, char>
         {
-            { '—', '-' },
+            { '—', '-' }
             //{ 'ё', 'е' },
             //{ 'Ё', 'Е' }
         };
@@ -105,6 +107,11 @@ namespace ModTranslator
         /// Окошко поиска.
         /// </summary>
         private readonly SearchWindow g_SearchWindow;
+
+        /// <summary>
+        /// Переменная для хранения выбранного столбца через ContextMenu
+        /// </summary>
+        //private DataGridColumn? g_SelectedColumn = null;
 
         public class TextImportInfo
         {
@@ -178,6 +185,8 @@ namespace ModTranslator
             MainDataGrid.LoadingRow += MainDataGrid_LoadingRow;
 
             MainDataGrid.Sorting += MainDataGrid_Sorting;
+
+            //MainDataGrid.ContextMenu.ContextMenuOpening += DataGridContextMenuOpening;
         }
 
         private void InitControlElementsHints()
@@ -253,7 +262,7 @@ namespace ModTranslator
             SaveButton.IsEnabled = true;
         }
 
-        public void UnloadTableTextData()
+        private void UnloadTableTextData()
         {
             if (IsLoadedTextData())
             {
@@ -271,7 +280,7 @@ namespace ModTranslator
             }
         }
 
-        public void UpdateTableTextData(List<ModTextRow> TextData)
+        private void UpdateTableTextData(List<ModTextRow> TextData)
         {
             g_CurrentMainGridData = TextData;
 
@@ -342,7 +351,7 @@ namespace ModTranslator
             return Result;
         }
 
-        static char? DetectCsvLineSeparator(string TextLine, char[] CandidateSeparators)
+        public static char? DetectCsvLineSeparator(string TextLine, char[] CandidateSeparators)
         {
             if (string.IsNullOrEmpty(TextLine) || CandidateSeparators == null || CandidateSeparators.Length == 0)
                 return null;
@@ -370,7 +379,7 @@ namespace ModTranslator
             return Result;
         }
 
-        static char? DetectCsvFileSeparator(string FilePath, char[] CandidateSeparators, int SampleLines)
+        public static char? DetectCsvFileSeparator(string FilePath, char[] CandidateSeparators, int SampleLines)
         {
             if (!File.Exists(FilePath) || CandidateSeparators.Length == 0)
                 return null;
@@ -400,7 +409,6 @@ namespace ModTranslator
             }
             return Result.Distinct().Count() == 1 ? Result[0] : null;
         }
-
 
         public static List<ModTextRow> ReadModTextCsvFile(string FilePath, char[] Separators, int MaxArgs = 3)
         {
@@ -669,7 +677,7 @@ namespace ModTranslator
             return Result;
         }
 
-        public static object? GetDataGridCellValue(DataGridCellInfo CellInfo)
+        private static object? GetDataGridCellValue(DataGridCellInfo CellInfo)
         {
             var Binding = new Binding();
 
@@ -692,7 +700,7 @@ namespace ModTranslator
             return null;
         }
 
-        public static string GetStringCellValue(object? Sender)
+        private static string GetCellStringValue(object? Sender)
         {
             if (Sender != null)
             {
@@ -702,6 +710,35 @@ namespace ModTranslator
                     return (string)Result;
             }
             return string.Empty;
+        }
+
+        public static bool SetCellValue(DataGrid TableGrid, int RowIndex, int ColumnIndex, string NewValue)
+        {
+            if (RowIndex < 0 || RowIndex >= TableGrid.Items.Count || ColumnIndex < 0 || ColumnIndex >= TableGrid.Columns.Count)
+            {
+                return false;
+            }
+
+            var item = TableGrid.Items[RowIndex];
+
+            var PropertyInfo = item.GetType().GetProperties()[ColumnIndex];
+
+            try
+            {
+                //var ConvertedValue = Convert.ChangeType(newValue, PropertyInfo.PropertyType);
+
+                PropertyInfo.SetValue(item, NewValue);
+
+                var Result = GetCellStringValue(TableGrid, RowIndex, ColumnIndex);
+
+                if (Result == NewValue)
+                    return true;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+            return false;
         }
 
         public ModTextRow? GetRowDataByIndex(int Index)
@@ -789,7 +826,7 @@ namespace ModTranslator
             return Result;
         }
 
-        public long HowManyTranslatedLines()
+        private long HowManyTranslatedLines()
         {
             long TranslatedCount = 0;
 
@@ -814,7 +851,7 @@ namespace ModTranslator
             SetTranslateCountLabel(HowManyTranslatedLines(), g_CurrentMainGridData.Count);
         }
 
-        public string ReplaceForbiddenChars(string Input)
+        private string ReplaceForbiddenChars(string Input)
         {
             if (string.IsNullOrEmpty(Input))
                 return Input;
@@ -872,7 +909,7 @@ namespace ModTranslator
                 else
                     return Result;
             }
-            return "";
+            return string.Empty;
         }
 
         private void ExportFileDialog()
@@ -921,7 +958,7 @@ namespace ModTranslator
 
             if (e.Column.Header.ToString() == "Перевод")
             {
-                g_CurrentCellValue = GetStringCellValue(sender);
+                g_CurrentCellValue = GetCellStringValue(sender);
             }
         }
 
@@ -964,7 +1001,7 @@ namespace ModTranslator
 
                     if (NewText != g_CurrentCellValue) // Если ячейка была изменена
                     {
-                        if (NewText == "") // и стала пустой, то
+                        if (NewText == string.Empty) // и стала пустой, то
                         {
                             if (TranslatedLines > 0)
                                 TranslatedLines--; // уменьшаем счётчик.
@@ -1082,7 +1119,7 @@ namespace ModTranslator
             return (-1, -1);
         }
 
-        public string? GetCellStringValue(DataGrid Table, int RowIndex, int ColumnIndex)
+        public static string? GetCellStringValue(DataGrid Table, int RowIndex, int ColumnIndex)
         {
             var Item = Table.Items[RowIndex];
 
@@ -1557,21 +1594,205 @@ namespace ModTranslator
                     // Недочёт: если изначально подсунуть ранее реверсивные данные, то значек направления будет не совпадать с сортировкой.
                     if (Column != null && Column.CanUserSort)
                     {
-                        if (Column.SortDirection == ListSortDirection.Ascending)
-                        { 
-                            Column.SortDirection = ListSortDirection.Descending; 
+                        if (Column.SortDirection != null)
+                        {
+                            if (Column.SortDirection == ListSortDirection.Ascending)
+                            {
+                                Column.SortDirection = ListSortDirection.Descending;
+                            }
+                            else
+                            {
+                                Column.SortDirection = ListSortDirection.Ascending;
+                            }
+
+                            g_CurrentMainGridData.Reverse(); // Вместо коллекций и прочего сортируем данные в лоб.
+
+                            UpdateTableTextData(g_CurrentMainGridData);
                         }
                         else
-                        {
                             Column.SortDirection = ListSortDirection.Ascending;
-                        }
-
-                        g_CurrentMainGridData.Reverse(); // Вместо коллекций и прочего сортируем данные в лоб.
-
-                        UpdateTableTextData(g_CurrentMainGridData); 
                     }
                 }
             }
+        }
+
+        /*
+        public static List<string> GetAllColumnText(DataGrid TableData, DataGridColumn Column)
+        {
+            var Result = new List<string>();
+
+            DataGridBoundColumn? BoundColumn = Column as DataGridBoundColumn;
+
+            if (BoundColumn == null)
+                return Result;
+
+            string? BindingPath = (BoundColumn.Binding as Binding)?.Path?.Path;
+
+            if (string.IsNullOrEmpty(BindingPath))
+                return Result;
+
+            foreach (var Item in TableData.Items)
+            {
+                if (Item == CollectionView.NewItemPlaceholder) // хз зачем это.
+                    continue;
+
+                var Property = Item.GetType().GetProperty(BindingPath);
+
+                var Value = Property?.GetValue(Item, null);
+
+                if (Value != null)
+                {
+                    var StringValue = Value.ToString();
+
+                    Result.Add(StringValue ?? string.Empty);
+                }
+            }
+            return Result;
+        }
+        */
+
+        public static List<string> GetAllColumnText(DataGrid TableData, DataGridColumn Column)
+        {
+            var Result = new List<string>();
+
+            if (TableData == null || Column == null)
+                return Result;
+
+            var ColumnIndex = TableData.Columns.IndexOf(Column);
+
+            if (ColumnIndex == -1)
+                return Result;
+
+            for (int i = 0; i < TableData.Items.Count; i++)
+            {
+                var CellValue = GetCellStringValue(TableData, i, ColumnIndex);
+
+                if (CellValue == null)
+                    CellValue = string.Empty;
+
+                Result.Add(CellValue);
+            }
+            return Result;
+        }
+
+        private bool SaveColumnDataDialog(DataGridColumn Column, bool ReWrite = false)
+        {
+            var FileDialog = new SaveFileDialog();
+
+            FileDialog.Title = $"Сохранить столбец {Column.Header} в";
+
+            FileDialog.FileName = $"{Column.Header}_text.txt";
+
+            FileDialog.DefaultExt = "txt";
+
+            FileDialog.Filter = "Текстовые файлы (*.txt)|*.txt|Все файлы (*.*)|*.*";
+
+            if (FileDialog.ShowDialog() == true)
+            {
+                if (FileDialog.FileName != null)
+                {
+                    var Result = GetAllColumnText(MainDataGrid, Column);
+
+                    File.WriteAllLines(FileDialog.FileName, Result, Encoding.UTF8);
+
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private bool ImportColumnDataDialog(DataGridColumn Column)
+        {
+            var FileDialog = new OpenFileDialog();
+
+            FileDialog.Title = $"Загрузить данные в столбец {Column.Header}";
+
+            FileDialog.FileName = $"{Column.Header}_text.txt";
+
+            FileDialog.DefaultExt = "txt";
+
+            FileDialog.Filter = "Текстовые файлы (*.txt)|*.txt|Все файлы (*.*)|*.*";
+
+            if (FileDialog.ShowDialog() == true)
+            {
+                if (FileDialog.FileName != null)
+                {
+                    var AllLines = File.ReadAllLines(FileDialog.FileName, Encoding.UTF8);
+
+                    if (AllLines.Length > MainDataGrid.Items.Count)
+                    {
+                        MessageBox.Show($"Файл {FileDialog.FileName} содержит больше полей, чем есть в таблице.", "Ошибка загрузки", MessageBoxButton.OK, MessageBoxImage.Error);
+
+                        return false;
+                    }
+
+                    if (AllLines.Length > 0)
+                    {
+                        int ColumnIndex = MainDataGrid.Columns.IndexOf(Column);
+
+                        if (ColumnIndex >= 0)
+                        {
+                            for (int i = 0; i < AllLines.Length; i++)
+                            {
+                                SetCellValue(MainDataGrid, i, ColumnIndex, AllLines[i]);
+
+                                MainDataGrid.Items.Refresh(); // Обновляем табличку.
+
+                                SetTranslateCountLabel(); 
+                            }
+                            return true;
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
+        private DataGridColumn? GetColumnByMenuContext(object Sender)
+        {
+            if (Sender is MenuItem Menu)
+            {
+                ContextMenu? MenuContext = Menu.Parent as ContextMenu;
+
+                if (MenuContext != null)
+                {
+                    bool isBoundColumn = MenuContext.PlacementTarget is DataGrid;
+
+                    if (MenuContext.PlacementTarget is DataGrid Grid)
+                    {
+                        DataGridColumn Column = Grid.CurrentColumn;
+
+                        return Column;
+                    }
+                }
+            }
+            return null;
+        }
+
+        private void DataGridMenuSaveAs_Click(object sender, RoutedEventArgs e)
+        {
+            var SelectedColumn = GetColumnByMenuContext(sender);
+
+            if (SelectedColumn != null)
+            {
+                SaveColumnDataDialog(SelectedColumn);
+            }
+        }
+
+        private void DataGridMenuImport_Click(object sender, RoutedEventArgs e)
+        {
+            var SelectedColumn = GetColumnByMenuContext(sender);
+
+            if (SelectedColumn != null)
+            {
+                ImportColumnDataDialog(SelectedColumn);
+            }
+        }
+
+        private void DataGridContextMenuOpening(object sender, ContextMenuEventArgs e)
+        {
+            if (!IsLoadedTextData()) // Не показываем меню, если не знагружена таблица.
+                e.Handled = true;
         }
 
     }
