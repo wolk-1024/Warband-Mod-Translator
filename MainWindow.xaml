@@ -21,49 +21,84 @@
         <ComboBox x:Name="SelectFilesBox" Margin="568,37,0,0" VerticalAlignment="Top" Height="25" IsEnabled="False" SelectedIndex="0" Grid.Column="1" SelectionChanged="SelectFilesBox_SelectionChanged" Grid.ColumnSpan="2" HorizontalAlignment="Left" Width="180"/>
 
         <DataGrid x:Name="MainDataGrid" Margin="15,121,15,15" AutoGenerateColumns="false" Grid.ColumnSpan="3" ColumnWidth="*" SelectionMode="Single" SelectionUnit="Cell" CanUserDeleteRows="False" CanUserAddRows="False" EnableRowVirtualization="True" CanUserResizeRows="True" FontSize="14">
+
+            <DataGrid.ColumnHeaderStyle>
+                <Style TargetType="{x:Type DataGridColumnHeader}">
+                    <EventSetter Event="Click" Handler="DataGridColumnHeader_Click"/>
+                </Style>
+            </DataGrid.ColumnHeaderStyle>
+
             <DataGrid.Columns>
 
-                <DataGridTextColumn Header="ID" Binding="{Binding RowId}" Width="200" CanUserSort="False" CanUserReorder="False" IsReadOnly="false" Visibility="Collapsed">
+                <DataGridTextColumn Header="№" Binding="{Binding RowNum}" Width="40" MaxWidth="60" CanUserSort="true" CanUserReorder="False" IsReadOnly="false" Visibility="Visible">
+
                     <DataGridTextColumn.ElementStyle>
-                        <Style>
-                            <Setter Property="TextBlock.TextWrapping" Value="Wrap"/>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="TextAlignment" Value="Center"/>
+                            <Setter Property="VerticalAlignment" Value="Center"/>
                         </Style>
                     </DataGridTextColumn.ElementStyle>
+
                     <DataGridTextColumn.EditingElementStyle>
-                        <Style TargetType="TextBox">
+                        <Style TargetType="{x:Type TextBox}">
+                            <Setter Property="IsReadOnly" Value="True"/>
+                            <Setter Property="TextAlignment" Value="Center"/>
+                            <Setter Property="VerticalAlignment" Value="Center"/>
+                        </Style>
+                    </DataGridTextColumn.EditingElementStyle>
+
+                </DataGridTextColumn>
+
+                <DataGridTextColumn Header="ID" Binding="{Binding RowId}" Width="200" CanUserSort="False" CanUserReorder="False" IsReadOnly="false" Visibility="Collapsed">
+
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="TextWrapping" Value="Wrap"/>
+                        </Style>
+                    </DataGridTextColumn.ElementStyle>
+
+                    <DataGridTextColumn.EditingElementStyle>
+                        <Style TargetType="{x:Type TextBox}">
                             <Setter Property="TextWrapping" Value="Wrap"/>
                             <Setter Property="IsReadOnly" Value="True"/>
                         </Style>
                     </DataGridTextColumn.EditingElementStyle>
+                    
                 </DataGridTextColumn>
 
                 <DataGridTextColumn Header="Оригинал" Binding="{Binding OriginalText}"  Width="*" IsReadOnly="False" CanUserSort="False" CanUserReorder="False" FontSize="14" CanUserResize="True">
+                    
                     <DataGridTextColumn.ElementStyle>
                         <Style>
                             <Setter Property="TextBlock.TextWrapping" Value="Wrap"/>
                         </Style>
                     </DataGridTextColumn.ElementStyle>
+                    
                     <DataGridTextColumn.EditingElementStyle>
-                        <Style TargetType="TextBox">
+                        <Style TargetType="{x:Type TextBox}">
                             <Setter Property="TextWrapping" Value="Wrap"/>
                             <Setter Property="AcceptsReturn" Value="True"/>
                             <Setter Property="IsReadOnly" Value="True"/>
                         </Style>
                     </DataGridTextColumn.EditingElementStyle>
+                    
                 </DataGridTextColumn>
 
                 <DataGridTextColumn Header="Перевод" Binding="{Binding TranslatedText}" Width="*" IsReadOnly="False" CanUserSort="False" CanUserReorder="False" FontSize="14" CanUserResize="True">
+                    
                     <DataGridTextColumn.ElementStyle>
                         <Style>
                             <Setter Property="TextBlock.TextWrapping" Value="Wrap"/>
                         </Style>
                     </DataGridTextColumn.ElementStyle>
+                    
                     <DataGridTextColumn.EditingElementStyle>
-                        <Style TargetType="TextBox">
+                        <Style TargetType="{x:Type TextBox}">
                             <Setter Property="TextWrapping" Value="Wrap"/>
                             <Setter Property="AcceptsReturn" Value="True"/>
                         </Style>
                     </DataGridTextColumn.EditingElementStyle>
+                    
                 </DataGridTextColumn>
 
             </DataGrid.Columns>
@@ -80,9 +115,13 @@
         <Button x:Name="PrevCellButton" Content="Пред." HorizontalAlignment="Left" Margin="0,81,0,0" VerticalAlignment="Top" Click="PrevCellButton_Click" Width="40" Height="25" Grid.Column="1" IsEnabled="False"/>
 
         <Menu x:Name="MainMenu" Grid.ColumnSpan="3" Height="20" VerticalAlignment="Top" Background="{Binding ElementName=grid, Mode=OneWay}">
+            
             <MenuItem x:Name="SettingsMenu" Margin="10,0,0,0" Header="Настройки" HorizontalAlignment="Left" VerticalAlignment="Top" Click="SettingsMenu_Click"/>
+            
             <MenuItem x:Name="SearchMenu" Header="Поиск" Click="SearchMenu_Click"/>
+            
             <MenuItem x:Name="AboutMenu" Header="?" Click="AboutMenu_Click"/>
+            
         </Menu>
 
     </Grid>

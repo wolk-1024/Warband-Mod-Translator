@@ -11,12 +11,14 @@
  */
 using Microsoft.Win32;
 using ModTranslatorSettings;
+using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Input;
 using WarbandAbout;
@@ -172,6 +174,10 @@ namespace ModTranslator
             ModPathText.KeyDown += ModPathText_KeyDown;
 
             this.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+
+            MainDataGrid.LoadingRow += MainDataGrid_LoadingRow;
+
+            MainDataGrid.Sorting += MainDataGrid_Sorting;
         }
 
         private void InitControlElementsHints()
@@ -712,7 +718,7 @@ namespace ModTranslator
 
         public bool SetColumnVisibility(string Name, Visibility Value)
         {
-            var Column = GetColumnByName(Name) as DataGridColumn;
+            var Column = GetColumnByName(Name);
 
             if (Column != null)
             {
@@ -760,8 +766,11 @@ namespace ModTranslator
             {
                 foreach (ModTextRow Data in TranslateData)
                 {
+                    if (IsDummyRow(Data)) // Не импортируем "противобаговую" строку.
+                        continue;
+
                     // Чувствителен к регистру.
-                    var DataIndex = g_CurrentMainGridData.FindIndex(0, g_CurrentMainGridData.Count, Item => Item.RowId == Data.RowId); // Ищем совпадения по Id
+                    var DataIndex = g_CurrentMainGridData.FindIndex(0, g_CurrentMainGridData.Count, Item => string.Equals(Item.RowId, Data.RowId, StringComparison.Ordinal)); // Ищем совпадения по Id
 
                     // Не чуствителен
                     //var DataIndex = g_CurrentMainGridData.FindIndex(0, g_CurrentMainGridData.Count, Item => string.Equals(Item.RowId, Data.RowId, StringComparison.OrdinalIgnoreCase));
@@ -983,14 +992,9 @@ namespace ModTranslator
             return null;
         }
 
-        public object? GetColumnByName(string Name)
+        public DataGridColumn? GetColumnByName(string Name)
         {
-            foreach (var Column in MainDataGrid.Columns)
-            {
-                if (Column.Header.ToString() == Name)
-                    return Column;
-            }
-            return null;
+            return GetColumnByName(MainDataGrid, Name);
         }
 
         public DataGridColumn? GetColumnByIndex(DataGrid Data, int Index)
@@ -1529,5 +1533,46 @@ namespace ModTranslator
 
             Window.Owner = this;
         }
+
+        private void MainDataGrid_LoadingRow(object? sender, DataGridRowEventArgs e)
+        {
+            //e.Row.Header = (e.Row.GetIndex() + 1).ToString();
+        }
+
+        private void MainDataGrid_Sorting(object sender, DataGridSortingEventArgs e)
+        {
+            e.Handled = true;
+        }
+
+        private void DataGridColumnHeader_Click(object sender, RoutedEventArgs e)
+        {
+            DataGridColumnHeader? Header = sender as DataGridColumnHeader;
+
+            if (Header != null)
+            {
+                DataGridColumn Column = Header.Column;
+                
+                if (Column.Header.ToString() == "№")
+                {
+                    // Недочёт: если изначально подсунуть ранее реверсивные данные, то значек направления будет не совпадать с сортировкой.
+                    if (Column != null && Column.CanUserSort)
+                    {
+                        if (Column.SortDirection == ListSortDirection.Ascending)
+                        { 
+                            Column.SortDirection = ListSortDirection.Descending; 
+                        }
+                        else
+                        {
+                            Column.SortDirection = ListSortDirection.Ascending;
+                        }
+
+                        g_CurrentMainGridData.Reverse(); // Вместо коллекций и прочего сортируем данные в лоб.
+
+                        UpdateTableTextData(g_CurrentMainGridData); 
+                    }
+                }
+            }
+        }
+
     }
 }
