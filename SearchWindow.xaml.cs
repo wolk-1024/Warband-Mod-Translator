@@ -69,7 +69,7 @@ namespace WarbandSearch
 
         private void ButtonSearch_Click(object sender, RoutedEventArgs e)
         {
-            int StartRow = MainWindow.g_LastSelectedRowIndex;
+            int StartRow = MainWindow.g_CurrentSelectedCell.RowIndex;
 
             if (StartRow >= 0 && g_FoundedCell.RowIndex >= 0)
                 StartRow++;

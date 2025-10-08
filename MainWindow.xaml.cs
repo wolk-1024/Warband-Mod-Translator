@@ -10,9 +10,7 @@
  *  Добавить больше горячих клавиш для поиска.
  */
 using Microsoft.Win32;
-using ModTranslatorSettings;
 using System.ComponentModel;
-using System.Data.Common;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -22,9 +20,10 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Input;
-using System.Windows.Media;
+
 using WarbandAbout;
 using WarbandSearch;
+using ModTranslatorSettings;
 using static WarbandParser.Parser;
 
 //#nullable disable
@@ -60,14 +59,14 @@ namespace ModTranslator
         public string g_FileForExport = string.Empty;
 
         /// <summary>
-        /// Значение текущей выделенной ячейки. (Только ячейка перевода)
+        /// Значение текущей выделенной ячейки. (Только ячейка из столбца перевода)
         /// </summary>
-        public string g_CurrentCellValue = string.Empty;
+        private string g_CurrentCellValue = string.Empty;
 
         /// <summary>
-        /// Индекс строки текущей выделенной ячейки.
+        /// Индекс текущей выделенной ячейки.
         /// </summary>
-        public int g_LastSelectedRowIndex = -1;
+        public (int RowIndex, int ColumnIndex) g_CurrentSelectedCell = (-1, -1);
 
         /// <summary>
         /// Тут все данные для биндинга с таблицей. Id, текст, перевод.
@@ -109,9 +108,9 @@ namespace ModTranslator
         private readonly SearchWindow g_SearchWindow;
 
         /// <summary>
-        /// Переменная для хранения выбранного столбца через ContextMenu
+        /// Текущий столбец, выбранный правой кнокой мыши.
         /// </summary>
-        //private DataGridColumn? g_SelectedColumn = null;
+        //private DataGridColumn? g_CurrentColumn = null;
 
         public class TextImportInfo
         {
@@ -266,7 +265,9 @@ namespace ModTranslator
         {
             if (IsLoadedTextData())
             {
-                g_LastSelectedRowIndex = -1;
+                g_CurrentSelectedCell.RowIndex = -1;
+
+                g_CurrentSelectedCell.ColumnIndex = -1;
 
                 g_FileForExport = string.Empty;
 
@@ -999,7 +1000,9 @@ namespace ModTranslator
 
                 if (RowIndex != -1)
                 {
-                    g_LastSelectedRowIndex = RowIndex;
+                    g_CurrentSelectedCell.RowIndex = RowIndex;
+
+                    g_CurrentSelectedCell.ColumnIndex = CellInfo.Column.DisplayIndex;
 
                     break;
                 }
@@ -1043,7 +1046,7 @@ namespace ModTranslator
 
                     g_CurrentCellValue = string.Empty;
                 }
-            }    
+            }
         }
 
         public DataGridColumn? GetColumnByName(DataGrid Data, string Name)
@@ -1455,33 +1458,42 @@ namespace ModTranslator
             }
         }
 
-        private int NextFocusCell(bool Cycle = false)
+        /// <summary>
+        /// Фокус на ближайшую+1 пустую ячейку
+        /// </summary>
+        /// <param name="TableGrid"></param>
+        /// <param name="ColumnName"></param>
+        /// <param name="Cycle"></param>
+        /// <returns></returns>
+        private int NextFocusCell(DataGrid TableGrid, string ColumnName, bool Cycle = false)
         {
             if (!IsLoadedTextData())
                 return -1;
 
-            int ColumnIndex = GetColumnIndexByName(MainDataGrid, "Перевод");
+            int ColumnIndex = GetColumnIndexByName(TableGrid, ColumnName);
 
             if (ColumnIndex == -1)
                 return -1;
 
-            if (g_LastSelectedRowIndex == MainDataGrid.Items.Count)
-                g_LastSelectedRowIndex = -1;
+            g_CurrentSelectedCell.ColumnIndex = ColumnIndex;
 
-            int NextIndex = g_LastSelectedRowIndex + 1; // Индекс следующей строки от текущей выделенной.
+            if (g_CurrentSelectedCell.RowIndex == TableGrid.Items.Count) // Если мы на полследней строке, то
+                g_CurrentSelectedCell.RowIndex = -1; // начинаем сначала
 
-            int CountCells = MainDataGrid.Items.Count; // Всего строк.
+            int NextIndex = g_CurrentSelectedCell.RowIndex + 1; // Индекс следующей строки от текущей выделенной.
+
+            int CountCells = TableGrid.Items.Count; // Всего строк.
 
             while (NextIndex < CountCells) // Пока индекс текущей строки меньше чем все.
             {
-                var ModText = MainDataGrid.Items[NextIndex] as ModTextRow;
+                var ModText = TableGrid.Items[NextIndex] as ModTextRow;
 
                 if (ModText == null)
                     return -1;
 
                 if (ModText.TranslatedText == string.Empty)
                 {
-                    FocusCell(MainDataGrid, NextIndex, ColumnIndex);
+                    FocusCell(TableGrid, NextIndex, ColumnIndex);
 
                     return 1;
                 }
@@ -1489,59 +1501,61 @@ namespace ModTranslator
             }
 
             if (Cycle)
-                g_LastSelectedRowIndex = -1;
+                g_CurrentSelectedCell.RowIndex = -1;
 
             return 0;
         }
 
-        private int PrevFocusCell(bool Cycle = false)
+        private int PrevFocusCell(DataGrid TableGrid, string ColumnName, bool Cycle = false)
         {
             if (!IsLoadedTextData())
                 return -1;
 
-            var ColumnIndex = GetColumnIndexByName(MainDataGrid, "Перевод");
+            var ColumnIndex = GetColumnIndexByName(TableGrid, ColumnName);
 
             if (ColumnIndex == -1)
                 return -1;
 
-            int PrevIndex = g_LastSelectedRowIndex;
+            g_CurrentSelectedCell.ColumnIndex = ColumnIndex;
 
-            if (g_LastSelectedRowIndex >= 0)
+            int PrevIndex = g_CurrentSelectedCell.RowIndex;
+
+            if (g_CurrentSelectedCell.RowIndex >= 0)
                 PrevIndex--;
             else
                 PrevIndex = 0;
 
-                while (PrevIndex >= 0)
+            while (PrevIndex >= 0)
+            {
+                var ModText = TableGrid.Items[PrevIndex] as ModTextRow;
+
+                if (ModText == null)
+                    return -1;
+
+                if (ModText.TranslatedText == string.Empty)
                 {
-                    var ModText = MainDataGrid.Items[PrevIndex] as ModTextRow;
+                    FocusCell(TableGrid, PrevIndex, ColumnIndex);
 
-                    if (ModText == null)
-                        return -1;
-
-                    if (ModText.TranslatedText == string.Empty)
-                    {
-                        FocusCell(MainDataGrid, PrevIndex, ColumnIndex);
-
-                        return 1;
-                    }
-                    PrevIndex--;
+                    return 1;
                 }
+                PrevIndex--;
+            }
 
             if (Cycle)
-                g_LastSelectedRowIndex = MainDataGrid.Items.Count;
+                g_CurrentSelectedCell.RowIndex = TableGrid.Items.Count;
 
             return 0;
         }
 
         private void NextCellButton_Click(object sender, RoutedEventArgs e)
         {
-            if (NextFocusCell(true) == 0)
+            if (NextFocusCell(MainDataGrid, "Перевод", true) == 0)
                 MessageBox.Show("Ничего не найдено", "Поиск", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
         private void PrevCellButton_Click(object sender, RoutedEventArgs e)
         {
-            if (PrevFocusCell(true) == 0)
+            if (PrevFocusCell(MainDataGrid, "Перевод", true) == 0)
                 MessageBox.Show("Ничего не найдено", "Поиск", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
@@ -1589,7 +1603,7 @@ namespace ModTranslator
             if (Header != null && IsLoadedTextData())
             {
                 DataGridColumn Column = Header.Column;
-                
+
                 if (Column.Header.ToString() == "№")
                 {
                     if (Column != null && Column.CanUserSort)
@@ -1742,7 +1756,7 @@ namespace ModTranslator
 
                                 TableGrid.Items.Refresh(); // Обновляем табличку.
 
-                                SetTranslateCountLabel(); 
+                                SetTranslateCountLabel();
                             }
                             return true;
                         }
@@ -1752,7 +1766,12 @@ namespace ModTranslator
             return false;
         }
 
-        private DataGridColumn? GetColumnByMenuContext(object Sender)
+        /// <summary>
+        /// Ищем столбец по PlacementTarget контестного меню.
+        /// </summary>
+        /// <param name="Sender"></param>
+        /// <returns></returns>
+        private static DataGridColumn? GetColumnByMenuContext(object Sender)
         {
             if (Sender is MenuItem Menu)
             {
@@ -1797,6 +1816,11 @@ namespace ModTranslator
         {
             if (!IsLoadedTextData()) // Не показываем меню, если не знагружена таблица.
                 e.Handled = true;
+
+            /*
+            if (sender is DataGrid TableGrid)
+                g_CurrentColumn = TableGrid.CurrentColumn;
+            */
         }
 
     }
