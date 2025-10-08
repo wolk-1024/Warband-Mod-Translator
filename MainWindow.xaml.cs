@@ -712,6 +712,33 @@ namespace ModTranslator
             return string.Empty;
         }
 
+
+        public static string? GetCellStringValue(DataGrid Table, int RowIndex, int ColumnIndex)
+        {
+            var Item = Table.Items[RowIndex];
+
+            var Column = Table.Columns[ColumnIndex];
+
+            if (Column is DataGridBoundColumn BoundColumn)
+            {
+                var Binding = BoundColumn.Binding as Binding;
+
+                if (Binding != null)
+                {
+                    var PropertyInfo = Item.GetType().GetProperty(Binding.Path.Path);
+
+                    if (PropertyInfo == null)
+                        return null;
+
+                    var Value = PropertyInfo.GetValue(Item);
+
+                    if (Value != null)
+                        return Value.ToString();
+                }
+            }
+            return null;
+        }
+
         public static bool SetCellValue(DataGrid TableGrid, int RowIndex, int ColumnIndex, string NewValue)
         {
             if (RowIndex < 0 || RowIndex >= TableGrid.Items.Count || ColumnIndex < 0 || ColumnIndex >= TableGrid.Columns.Count)
@@ -1117,32 +1144,6 @@ namespace ModTranslator
                 }
             }
             return (-1, -1);
-        }
-
-        public static string? GetCellStringValue(DataGrid Table, int RowIndex, int ColumnIndex)
-        {
-            var Item = Table.Items[RowIndex];
-
-            var Column = Table.Columns[ColumnIndex];
-
-            if (Column is DataGridBoundColumn BoundColumn)
-            {
-                var Binding = BoundColumn.Binding as Binding;
-
-                if (Binding != null)
-                {
-                    var PropertyInfo = Item.GetType().GetProperty(Binding.Path.Path);
-
-                    if (PropertyInfo == null)
-                        return null;
-
-                    var Value = PropertyInfo.GetValue(Item);
-
-                    if (Value != null)
-                        return Value.ToString();
-                }
-            }
-            return null;
         }
 
         private void SelectFilesBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -1585,32 +1586,34 @@ namespace ModTranslator
         {
             DataGridColumnHeader? Header = sender as DataGridColumnHeader;
 
-            if (Header != null)
+            if (Header != null && IsLoadedTextData())
             {
                 DataGridColumn Column = Header.Column;
                 
                 if (Column.Header.ToString() == "№")
                 {
-                    // Недочёт: если изначально подсунуть ранее реверсивные данные, то значек направления будет не совпадать с сортировкой.
                     if (Column != null && Column.CanUserSort)
                     {
-                        if (Column.SortDirection != null)
+                        int RowNum = 0;
+
+                        int.TryParse(g_CurrentMainGridData[0].RowNum, out RowNum);
+
+                        if (Column.SortDirection == null && RowNum == 1)
                         {
-                            if (Column.SortDirection == ListSortDirection.Ascending)
-                            {
-                                Column.SortDirection = ListSortDirection.Descending;
-                            }
-                            else
-                            {
-                                Column.SortDirection = ListSortDirection.Ascending;
-                            }
-
-                            g_CurrentMainGridData.Reverse(); // Вместо коллекций и прочего сортируем данные в лоб.
-
-                            UpdateTableTextData(g_CurrentMainGridData);
-                        }
-                        else
                             Column.SortDirection = ListSortDirection.Ascending;
+                        }
+                        else if (Column.SortDirection == ListSortDirection.Ascending)
+                        {
+                            Column.SortDirection = ListSortDirection.Descending;
+                        }
+                        else if (Column.SortDirection == ListSortDirection.Descending)
+                        {
+                            Column.SortDirection = ListSortDirection.Ascending;
+                        }
+
+                        g_CurrentMainGridData.Reverse(); // Вместо коллекций и прочего сортируем данные в лоб.
+
+                        UpdateTableTextData(g_CurrentMainGridData);
                     }
                 }
             }
@@ -1663,9 +1666,9 @@ namespace ModTranslator
             if (ColumnIndex == -1)
                 return Result;
 
-            for (int i = 0; i < TableData.Items.Count; i++)
+            for (int RowIndex = 0; RowIndex < TableData.Items.Count; RowIndex++)
             {
-                var CellValue = GetCellStringValue(TableData, i, ColumnIndex);
+                var CellValue = GetCellStringValue(TableData, RowIndex, ColumnIndex);
 
                 if (CellValue == null)
                     CellValue = string.Empty;
@@ -1675,7 +1678,7 @@ namespace ModTranslator
             return Result;
         }
 
-        private bool SaveColumnDataDialog(DataGridColumn Column, bool ReWrite = false)
+        private bool SaveColumnDataDialog(DataGrid TableGrid, DataGridColumn Column, bool ReWrite = false)
         {
             var FileDialog = new SaveFileDialog();
 
@@ -1691,17 +1694,18 @@ namespace ModTranslator
             {
                 if (FileDialog.FileName != null)
                 {
-                    var Result = GetAllColumnText(MainDataGrid, Column);
+                    var Result = GetAllColumnText(TableGrid, Column);
 
                     File.WriteAllLines(FileDialog.FileName, Result, Encoding.UTF8);
 
-                    return true;
+                    if (Result.Count == TableGrid.Items.Count)
+                        return true;
                 }
             }
             return false;
         }
 
-        private bool ImportColumnDataDialog(DataGridColumn Column)
+        private bool ImportColumnDataDialog(DataGrid TableGrid, DataGridColumn Column)
         {
             var FileDialog = new OpenFileDialog();
 
@@ -1719,7 +1723,7 @@ namespace ModTranslator
                 {
                     var AllLines = File.ReadAllLines(FileDialog.FileName, Encoding.UTF8);
 
-                    if (AllLines.Length > MainDataGrid.Items.Count)
+                    if (AllLines.Length > TableGrid.Items.Count)
                     {
                         MessageBox.Show($"Файл {FileDialog.FileName} содержит больше полей, чем есть в таблице.", "Ошибка загрузки", MessageBoxButton.OK, MessageBoxImage.Error);
 
@@ -1728,15 +1732,15 @@ namespace ModTranslator
 
                     if (AllLines.Length > 0)
                     {
-                        int ColumnIndex = MainDataGrid.Columns.IndexOf(Column);
+                        int ColumnIndex = TableGrid.Columns.IndexOf(Column);
 
                         if (ColumnIndex >= 0)
                         {
                             for (int i = 0; i < AllLines.Length; i++)
                             {
-                                SetCellValue(MainDataGrid, i, ColumnIndex, AllLines[i]);
+                                SetCellValue(TableGrid, i, ColumnIndex, AllLines[i]);
 
-                                MainDataGrid.Items.Refresh(); // Обновляем табличку.
+                                TableGrid.Items.Refresh(); // Обновляем табличку.
 
                                 SetTranslateCountLabel(); 
                             }
@@ -1775,7 +1779,7 @@ namespace ModTranslator
 
             if (SelectedColumn != null)
             {
-                SaveColumnDataDialog(SelectedColumn);
+                SaveColumnDataDialog(MainDataGrid, SelectedColumn);
             }
         }
 
@@ -1785,7 +1789,7 @@ namespace ModTranslator
 
             if (SelectedColumn != null)
             {
-                ImportColumnDataDialog(SelectedColumn);
+                ImportColumnDataDialog(MainDataGrid, SelectedColumn);
             }
         }
 

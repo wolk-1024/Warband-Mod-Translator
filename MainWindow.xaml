@@ -38,7 +38,7 @@
 
             <DataGrid.Columns>
 
-                <DataGridTextColumn Header="№" Binding="{Binding RowNum}" Width="40" CanUserSort="true" CanUserReorder="False" IsReadOnly="false" Visibility="Visible">
+                <DataGridTextColumn Header="№" Binding="{Binding RowNum}" Width="40" MaxWidth="60" CanUserSort="true" CanUserReorder="False" IsReadOnly="false" Visibility="Visible">
 
                     <DataGridTextColumn.ElementStyle>
                         <Style TargetType="TextBlock">

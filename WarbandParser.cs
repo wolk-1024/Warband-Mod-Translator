@@ -57,7 +57,7 @@ namespace WarbandParser
 
         public class ModTextRow
         {
-            public int RowNum { get; set; } = 0;
+            public string RowNum { get; set; } = string.Empty;
 
             public string RowId { get; set; } = string.Empty;
 
@@ -163,7 +163,7 @@ namespace WarbandParser
             int Count = 1;
 
             foreach (var Res in Data)
-                Res.RowNum = Count++;
+                Res.RowNum = Count++.ToString();
 
             return Data;
         }
