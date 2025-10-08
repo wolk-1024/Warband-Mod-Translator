@@ -11,6 +11,7 @@
  *  Добавить больше горячих клавиш для поиска.
  */
 using Microsoft.Win32;
+using ModTranslatorSettings;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
@@ -20,11 +21,10 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Data;
+using System.Windows.Documents;
 using System.Windows.Input;
-
 using WarbandAbout;
 using WarbandSearch;
-using ModTranslatorSettings;
 using static WarbandParser.Parser;
 
 //#nullable disable
@@ -1116,36 +1116,20 @@ namespace ModTranslator
         /// <param name="VisibleColumn">Поиск только в отображаемых столбцах</param>
         /// <param name="Case"></param>
         /// <returns></returns>
-        public (int RowIndex, int ColumnIndex) FindCellByString(DataGrid Table, string Value, int StartRow, bool FullSearch = false, bool VisibleColumn = true, StringComparison Case = StringComparison.Ordinal)
+        public (int RowIndex, int ColumnIndex) FindCellByString(DataGrid DataTable, string Value, int StartRow, bool FullSearch = false, bool VisibleColumn = true, StringComparison Case = StringComparison.Ordinal)
         {
-            for (int Row = StartRow; Row < Table.Items.Count; Row++)
+            for (int ColumnIndex = 0; ColumnIndex < DataTable.Columns.Count; ColumnIndex++)
             {
-                for (int Col = 0; Col < Table.Columns.Count; Col++)
+                if (VisibleColumn) // Поиск только в видимых столбцах.
                 {
-                    if (VisibleColumn) // Поиск только в видимых столбцах.
-                    {
-                        if (Table.Columns[Col].Visibility != Visibility.Visible)
-                            continue;
-                    }
-
-                    var CellValue = GetCellStringValue(Table, Row, Col);
-
-                    if (CellValue != null)
-                    {
-                        string Result = CellValue.ToString();
-
-                        if (FullSearch)
-                        {
-                            if (Result.Equals(Value, Case))
-                                return (Row, Col);
-                        }
-                        else
-                        {
-                            if (Result.IndexOf(Value, Case) >= 0)
-                                return (Row, Col);
-                        }
-                    }
+                    if (DataTable.Columns[ColumnIndex].Visibility != Visibility.Visible)
+                        continue;
                 }
+
+                var RowIndex = FindCellInColumn(DataTable, Value, StartRow, ColumnIndex, FullSearch, Case);
+
+                if (RowIndex >= 0)
+                    return (RowIndex, ColumnIndex);
             }
             return (-1, -1);
         }
@@ -1457,6 +1441,34 @@ namespace ModTranslator
                     //Data.BeginEdit();
                 }
             }
+        }
+
+        private int FindCellInColumn(DataGrid TableGrid, string Value, int StartRow, int ColumnIndex, bool FullSearch = false, StringComparison Case = StringComparison.Ordinal)
+        {
+            if (ColumnIndex > TableGrid.Columns.Count)
+                return -1;
+
+            for (int Row = StartRow; Row < TableGrid.Items.Count; Row++)
+            {
+                var CellValue = GetCellStringValue(TableGrid, Row, ColumnIndex);
+
+                if (CellValue != null)
+                {
+                    string Result = CellValue.ToString();
+
+                    if (FullSearch)
+                    {
+                        if (Result.Equals(Value, Case))
+                            return Row;
+                    }
+                    else
+                    {
+                        if (Result.IndexOf(Value, Case) >= 0)
+                            return Row;
+                    }
+                }
+            }
+            return -1;
         }
 
         /// <summary>
