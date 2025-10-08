@@ -437,9 +437,10 @@ namespace ModTranslator
 
                 if (LineArgs.Count <= 1 || LineArgs.Count > MaxArgs) // Параметров не должно быть больше MaxArgs, если больше, то явная ошибка.
                 {
-                    Result.Clear();
+                    //Result.Clear();
 
-                    return Result;
+                    //return Result;
+                    continue;
                 }
 
                 Result.Add(new ModTextRow
