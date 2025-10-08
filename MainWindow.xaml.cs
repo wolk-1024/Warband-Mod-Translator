@@ -1615,7 +1615,7 @@ namespace ModTranslator
 
                         if (Column.SortDirection == null && RowNum == 1)
                         {
-                            Column.SortDirection = ListSortDirection.Ascending;
+                            Column.SortDirection = ListSortDirection.Descending;
                         }
                         else if (Column.SortDirection == ListSortDirection.Ascending)
                         {
