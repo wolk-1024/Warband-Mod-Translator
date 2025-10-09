@@ -1105,6 +1105,34 @@ namespace ModTranslator
             return null;
         }
 
+        public static int FindCellByStrinInColumn(DataGrid TableGrid, string Value, int StartRow, int ColumnIndex, bool FullSearch = false, StringComparison Case = StringComparison.Ordinal)
+        {
+            if (ColumnIndex > TableGrid.Columns.Count || StartRow < 0 || ColumnIndex < 0)
+                return -1;
+
+            for (int Row = StartRow; Row < TableGrid.Items.Count; Row++)
+            {
+                var CellValue = GetCellStringValue(TableGrid, Row, ColumnIndex);
+
+                if (CellValue != null)
+                {
+                    string Result = CellValue.ToString();
+
+                    if (FullSearch)
+                    {
+                        if (Result.Equals(Value, Case))
+                            return Row;
+                    }
+                    else
+                    {
+                        if (Result.IndexOf(Value, Case) >= 0)
+                            return Row;
+                    }
+                }
+            }
+            return -1;
+        }
+
         /// <summary>
         /// 
         /// </summary>
@@ -1126,7 +1154,7 @@ namespace ModTranslator
                         continue;
                 }
 
-                var RowIndex = FindCellInColumn(DataTable, Value, StartRow, ColumnIndex, FullSearch, Case);
+                var RowIndex = FindCellByStrinInColumn(DataTable, Value, StartRow, ColumnIndex, FullSearch, Case);
 
                 if (RowIndex >= 0)
                     return (RowIndex, ColumnIndex);
@@ -1441,34 +1469,6 @@ namespace ModTranslator
                     //Data.BeginEdit();
                 }
             }
-        }
-
-        private int FindCellInColumn(DataGrid TableGrid, string Value, int StartRow, int ColumnIndex, bool FullSearch = false, StringComparison Case = StringComparison.Ordinal)
-        {
-            if (ColumnIndex > TableGrid.Columns.Count)
-                return -1;
-
-            for (int Row = StartRow; Row < TableGrid.Items.Count; Row++)
-            {
-                var CellValue = GetCellStringValue(TableGrid, Row, ColumnIndex);
-
-                if (CellValue != null)
-                {
-                    string Result = CellValue.ToString();
-
-                    if (FullSearch)
-                    {
-                        if (Result.Equals(Value, Case))
-                            return Row;
-                    }
-                    else
-                    {
-                        if (Result.IndexOf(Value, Case) >= 0)
-                            return Row;
-                    }
-                }
-            }
-            return -1;
         }
 
         /// <summary>
