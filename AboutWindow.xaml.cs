@@ -1,4 +1,5 @@
 ﻿using System.Windows;
+using System.Windows.Controls;
 
 namespace WarbandAbout
 {
@@ -6,9 +7,9 @@ namespace WarbandAbout
     {
         private void InitAboutWindow()
         {
-            this.Width = 350;
+            this.Width = 650;
 
-            this.Height = 250;
+            this.Height = 400;
 
             this.ResizeMode = ResizeMode.NoResize;
 
