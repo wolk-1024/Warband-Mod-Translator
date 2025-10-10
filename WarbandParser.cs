@@ -540,6 +540,11 @@ namespace WarbandParser
             return null;
         }
 
+        /// <summary>
+        /// Есть проблемы: в menus.txt бывают подменю mno_ дубликаты, но с разными значениями.
+        /// </summary>
+        /// <param name="FilePath"></param>
+        /// <returns></returns>
         public static List<ModTextRow>? LoadAndParseMenuFile(string FilePath)
         {
             if (string.IsNullOrEmpty(FilePath))
@@ -579,6 +584,8 @@ namespace WarbandParser
 
                     if (PartsOfMenu.Count > 0)
                     {
+                        var MnoList = new List<ModTextRow>();
+
                         foreach (var PartMenuLine in PartsOfMenu)
                         {
                             var PartMenuArgs = GetModTextArgs(PartMenuLine, "mno_", 2);
@@ -595,7 +602,7 @@ namespace WarbandParser
 
                             if (!TextStartWithError(PartText))
                             {
-                                ModTextResult.Add(
+                                MnoList.Add(
                                     new ModTextRow
                                     {
                                         RowId = PartID,
@@ -603,6 +610,8 @@ namespace WarbandParser
                                     });
                             }
                         }
+                        // Где-то тут должна быть работа с дубликатами подменю.
+                        ModTextResult.AddRange(MnoList);
                     }
                 }
                 int RemovedIds;

@@ -3,6 +3,7 @@
  *  
  *  Планы на релизную версию: 
  *  
+ *  Сделать работу с дубликатами подменю из menus.txt (важно!)
  *  Исправить недостатки парсера.
  *  Добавить локализацию на английский.
  *  Доработать режим сравнения.
@@ -21,7 +22,6 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Data;
-using System.Windows.Documents;
 using System.Windows.Input;
 using WarbandAbout;
 using WarbandSearch;
@@ -571,7 +571,7 @@ namespace ModTranslator
                             Result = LoadAndParseItemModifiersFile(FilePath);
                             break;
                         }
-                    case "menus.txt":
+                    case "menus.txt": // Есть проблемы: в файле содержатся часто содержатся одинаковые id, но имеют разное значение.
                         {
                             Result = LoadAndParseMenuFile(FilePath);
                             break;
