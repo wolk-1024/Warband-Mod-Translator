@@ -13,11 +13,8 @@
  */
 
 using Microsoft.Win32;
-using ModTranslatorSettings;
-using System;
 using System.ComponentModel;
 using System.IO;
-using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Windows;
@@ -28,6 +25,7 @@ using System.Windows.Input;
 
 using WarbandAbout;
 using WarbandSearch;
+using ModTranslatorSettings;
 using static WarbandParser.Parser;
 
 //#nullable disable
@@ -1662,12 +1660,24 @@ namespace ModTranslator
         private void DataGridContextMenuOpening(object sender, ContextMenuEventArgs e)
         {
             if (!IsLoadedTextData()) // Не показываем меню, если не знагружена таблица.
+            {
                 e.Handled = true;
 
-            /*
+                return;
+            }
+
             if (sender is DataGrid TableGrid)
-                g_CurrentColumn = TableGrid.CurrentColumn;
-            */
+            {
+                var CurrentColumn = TableGrid.CurrentColumn;
+
+                if (CurrentColumn.Header.ToString() == "№")
+                    e.Handled = true;
+            }
+        }
+
+        private void MainDataGrid_Sorting(object sender, DataGridSortingEventArgs e)
+        {
+            e.Handled = true; // Не трогать
         }
 
     }

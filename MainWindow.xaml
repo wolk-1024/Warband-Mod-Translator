@@ -34,7 +34,8 @@
                   ContextMenuOpening="DataGridContextMenuOpening" 
                   BeginningEdit="DataGridCellBegining"
                   CellEditEnding="DataGridCellEditEnding"
-                  SelectedCellsChanged ="DataGridSelectedCellsChanged">
+                  SelectedCellsChanged ="DataGridSelectedCellsChanged"
+                  Sorting="MainDataGrid_Sorting">
 
             <DataGrid.ContextMenu>
                 <ContextMenu>

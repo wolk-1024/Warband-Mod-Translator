@@ -71,7 +71,6 @@ namespace WarbandParser
             public string TranslatedText { get; set; } = string.Empty;
         }
 
-
         public static bool IsLineStartsWithPrefix(string Input)
         {
             if (!string.IsNullOrEmpty(Input))
@@ -165,7 +164,7 @@ namespace WarbandParser
             return false;
         }
 
-        public static List<ModTextRow> UpdateNumber(List<ModTextRow> Data)
+        private static List<ModTextRow> UpdateNumber(List<ModTextRow> Data)
         {
             int Count = 1;
 
