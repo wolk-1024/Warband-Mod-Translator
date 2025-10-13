@@ -21,7 +21,12 @@ namespace WarbandParser
     public static class Parser
     {
         /// <summary>
-        /// Регулярка для поиска только знаков и цифр.
+        /// Удалять дубликаты Id.
+        /// </summary>
+        public static bool g_DeleteDublicatesIDs = true;
+
+        /// <summary>
+        /// Регулярка для поиска знаков и цифр.
         /// </summary>
         private static readonly Regex RegSymbolsAndNumbers = new Regex(@"^[^\p{L}]*$", RegexOptions.Compiled);
 
@@ -33,7 +38,7 @@ namespace WarbandParser
         /// <summary>
         /// Игнорирование {!} в строках. Не трогать.
         /// </summary>
-        public static bool g_IgnoreBlockingSymbol = false;
+        private static bool g_IgnoreBlockingSymbol = false;
 
         private readonly static string[] IdPrefixesList =
         {
@@ -103,6 +108,7 @@ namespace WarbandParser
             return false;
         }
 
+        /*
         public static string RemoveAllNumbers(string Input)
         {
             try
@@ -120,6 +126,7 @@ namespace WarbandParser
                 return "";
             }
         }
+        */
 
         private static bool TextStartWithError(string Input)
         {
@@ -135,7 +142,7 @@ namespace WarbandParser
             return false;
         }
 
-        static string RemoveWordFromStart(string Input, string WordToRemove)
+        private static string RemoveWordFromStart(string Input, string WordToRemove)
         {
             if (string.IsNullOrEmpty(Input) || string.IsNullOrEmpty(WordToRemove))
                 return Input;
@@ -158,7 +165,7 @@ namespace WarbandParser
             return false;
         }
 
-        private static List<ModTextRow> UpdateNumber(List<ModTextRow> Data)
+        public static List<ModTextRow> UpdateNumber(List<ModTextRow> Data)
         {
             int Count = 1;
 
@@ -331,11 +338,15 @@ namespace WarbandParser
                     }
 
                 }
-                int RemovedIds;
+                if (g_DeleteDublicatesIDs)
+                {
+                    int RemovedIds;
 
-                var Result = RemoveDuplicateIDs(ModTextResult, out RemovedIds);
+                    var Result = RemoveDuplicateIDs(ModTextResult, out RemovedIds);
 
-                return UpdateNumber(Result);
+                    return UpdateNumber(Result);
+                }
+                return UpdateNumber(ModTextResult);
             }
 
             return null;
@@ -375,11 +386,15 @@ namespace WarbandParser
                             OriginalText = OriginalText
                         });
                 }
-                int RemovedIds;
+                if (g_DeleteDublicatesIDs)
+                {
+                    int RemovedIds;
 
-                var Result = RemoveDuplicateIDs(ModTextResult, out RemovedIds);
+                    var Result = RemoveDuplicateIDs(ModTextResult, out RemovedIds);
 
-                return UpdateNumber(Result);
+                    return UpdateNumber(Result);
+                }
+                return UpdateNumber(ModTextResult);
             }
             return null;
         }
@@ -429,11 +444,15 @@ namespace WarbandParser
                             });
                     }
                 }
-                int RemovedIds;
+                if (g_DeleteDublicatesIDs)
+                {
+                    int RemovedIds;
 
-                var Result = RemoveDuplicateIDs(ModTextResult, out RemovedIds);
+                    var Result = RemoveDuplicateIDs(ModTextResult, out RemovedIds);
 
-                return UpdateNumber(Result);
+                    return UpdateNumber(Result);
+                }
+                return UpdateNumber(ModTextResult);
             }
             return null;
         }
@@ -486,11 +505,15 @@ namespace WarbandParser
                             });
                     }
                 }
-                int RemovedIds;
+                if (g_DeleteDublicatesIDs)
+                {
+                    int RemovedIds;
 
-                var Result = RemoveDuplicateIDs(ModTextResult, out RemovedIds);
+                    var Result = RemoveDuplicateIDs(ModTextResult, out RemovedIds);
 
-                return UpdateNumber(Result);
+                    return UpdateNumber(Result);
+                }
+                return UpdateNumber(ModTextResult);
             }
             return null;
         }
@@ -530,12 +553,15 @@ namespace WarbandParser
                             });
                     }
                 }
+                if (g_DeleteDublicatesIDs)
+                {
+                    int RemovedIds;
 
-                int RemovedIds;
+                    var Result = RemoveDuplicateIDs(ModTextResult, out RemovedIds);
 
-                var Result = RemoveDuplicateIDs(ModTextResult, out RemovedIds);
-
-                return UpdateNumber(Result);
+                    return UpdateNumber(Result);
+                }
+                return UpdateNumber(ModTextResult);
             }
             return null;
         }
@@ -614,11 +640,15 @@ namespace WarbandParser
                         ModTextResult.AddRange(MnoList);
                     }
                 }
-                int RemovedIds;
+                if (g_DeleteDublicatesIDs)
+                {
+                    int RemovedIds;
 
-                var Result = RemoveDuplicateIDs(ModTextResult, out RemovedIds);
+                    var Result = RemoveDuplicateIDs(ModTextResult, out RemovedIds);
 
-                return UpdateNumber(Result);
+                    return UpdateNumber(Result);
+                }
+                return UpdateNumber(ModTextResult);
             }
             return null;
         }
@@ -658,12 +688,15 @@ namespace WarbandParser
                             });
                     }
                 }
+                if (g_DeleteDublicatesIDs)
+                {
+                    int RemovedIds;
 
-                int RemovedIds;
+                    var Result = RemoveDuplicateIDs(ModTextResult, out RemovedIds);
 
-                var Result = RemoveDuplicateIDs(ModTextResult, out RemovedIds);
-
-                return UpdateNumber(Result);
+                    return UpdateNumber(Result);
+                }
+                return UpdateNumber(ModTextResult);
             }
             return null;
         }
@@ -703,12 +736,15 @@ namespace WarbandParser
                             });
                     }
                 }
+                if (g_DeleteDublicatesIDs)
+                {
+                    int RemovedIds;
 
-                int RemovedIds;
+                    var Result = RemoveDuplicateIDs(ModTextResult, out RemovedIds);
 
-                var Result = RemoveDuplicateIDs(ModTextResult, out RemovedIds);
-
-                return UpdateNumber(Result);
+                    return UpdateNumber(Result);
+                }
+                return UpdateNumber(ModTextResult);
             }
             return null;
         }
@@ -762,11 +798,15 @@ namespace WarbandParser
                             });
                     }
                 }
-                int RemovedIds;
+                if (g_DeleteDublicatesIDs)
+                {
+                    int RemovedIds;
 
-                var Result = RemoveDuplicateIDs(ModTextResult, out RemovedIds);
+                    var Result = RemoveDuplicateIDs(ModTextResult, out RemovedIds);
 
-                return UpdateNumber(Result);
+                    return UpdateNumber(Result);
+                }
+                return UpdateNumber(ModTextResult);
             }
             return null;
         }
@@ -806,12 +846,15 @@ namespace WarbandParser
                             });
                     }
                 }
+                if (g_DeleteDublicatesIDs)
+                {
+                    int RemovedIds;
 
-                int RemovedIds;
+                    var Result = RemoveDuplicateIDs(ModTextResult, out RemovedIds);
 
-                var Result = RemoveDuplicateIDs(ModTextResult, out RemovedIds);
-
-                return UpdateNumber(Result);
+                    return UpdateNumber(Result);
+                }
+                return UpdateNumber(ModTextResult);
             }
             return null;
         }
@@ -862,12 +905,15 @@ namespace WarbandParser
                         });
 
                 }
+                if (g_DeleteDublicatesIDs)
+                {
+                    int RemovedIds;
 
-                int RemovedIds;
+                    var Result = RemoveDuplicateIDs(ModTextResult, out RemovedIds);
 
-                var Result = RemoveDuplicateIDs(ModTextResult, out RemovedIds);
-
-                return UpdateNumber(Result);
+                    return UpdateNumber(Result);
+                }
+                return UpdateNumber(ModTextResult);
             }
 
             return null;
@@ -905,11 +951,15 @@ namespace WarbandParser
                             OriginalText = Skins
                         });
                 }
-                int RemovedIds; // >90% дубликатов. Это норм?
+                if (g_DeleteDublicatesIDs)
+                {
+                    int RemovedIds;
 
-                var Result = RemoveDuplicateIDs(ModTextResult, out RemovedIds);
+                    var Result = RemoveDuplicateIDs(ModTextResult, out RemovedIds);
 
-                return UpdateNumber(Result);
+                    return UpdateNumber(Result);
+                }
+                return UpdateNumber(ModTextResult);
             }
             return null;
         }
@@ -949,12 +999,15 @@ namespace WarbandParser
                             });
                     }
                 }
+                if (g_DeleteDublicatesIDs)
+                {
+                    int RemovedIds;
 
-                int RemovedIds;
+                    var Result = RemoveDuplicateIDs(ModTextResult, out RemovedIds);
 
-                var Result = RemoveDuplicateIDs(ModTextResult, out RemovedIds);
-
-                return UpdateNumber(Result);
+                    return UpdateNumber(Result);
+                }
+                return UpdateNumber(ModTextResult);
             }
             return null;
         }
@@ -1010,12 +1063,15 @@ namespace WarbandParser
                             });
                     }
                 }
+                if (g_DeleteDublicatesIDs)
+                {
+                    int RemovedIds;
 
-                int RemovedIds;
+                    var Result = RemoveDuplicateIDs(ModTextResult, out RemovedIds);
 
-                var Result = RemoveDuplicateIDs(ModTextResult, out RemovedIds);
-
-                return UpdateNumber(Result);
+                    return UpdateNumber(Result);
+                }
+                return UpdateNumber(ModTextResult);
             }
             return null;
         }

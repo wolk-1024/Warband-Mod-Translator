@@ -11,8 +11,10 @@
  *  Добавить работу с несколькими категориями одновременно, без перезагрузки таблицы.
  *  Добавить больше горячих клавиш для поиска.
  */
+
 using Microsoft.Win32;
 using ModTranslatorSettings;
+using System;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
@@ -23,6 +25,7 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Input;
+
 using WarbandAbout;
 using WarbandSearch;
 using static WarbandParser.Parser;
@@ -141,21 +144,6 @@ namespace ModTranslator
             { "Войска",              ("troops.txt",          "troops.csv") },
         };
 
-        /*
-        public class CollectionTextData
-        {
-            public bool IsLoaded { get; set; }
-
-            public bool DataHasBeenChanged { get; set; }
-
-            public string? FileForExport { get; set; }
-
-            public string? FileForTranslate { get; set; }
-
-            public List<ModTextRow> TextData = new List<ModTextRow>();
-        }
-        */
-
         public void InitMainWindow()
         {
             this.Title = AppTitle;
@@ -166,38 +154,11 @@ namespace ModTranslator
 
             this.WindowState = WindowState.Normal;
 
-            this.Closing += MainWindowClosing; // Обработка закрытия окна.
-
-            this.KeyDown += KeyDownHandler; // Глобальная обработка нажатий клавиш.
-
-            MainDataGrid.BeginningEdit += DataGridCellBegining;
-
-            MainDataGrid.CellEditEnding += DataGridCellEditEnding;
-
-            MainDataGrid.SelectedCellsChanged += DataGridSelectedCellsChanged;
-
-            SelectFilesBox.SelectionChanged += SelectFilesBox_SelectionChanged;
-
-            ModPathText.KeyDown += ModPathText_KeyDown;
-
             this.WindowStartupLocation = WindowStartupLocation.CenterScreen;
 
-            MainDataGrid.LoadingRow += MainDataGrid_LoadingRow;
+            this.Closing += MainWindowClosing; // Обработка закрытия окна.
 
-            MainDataGrid.Sorting += MainDataGrid_Sorting;
-
-            //MainDataGrid.ContextMenu.ContextMenuOpening += DataGridContextMenuOpening;
-        }
-
-        private void InitControlElementsHints()
-        {
-            NextCellButton.ToolTip = "Перейти к следующей непереведённой строке";
-
-            PrevCellButton.ToolTip = "Перейти к предыдущей непереведённой строке";
-
-            SelectFilesBox.ToolTip = "Список игровых категорий";
-
-            SearchMenu.ToolTip = "Ctrl + F";
+            this.KeyDown += KeyDownHandler;  // Глобальная обработка нажатий клавиш.
         }
 
         public MainTranslatorWindow()
@@ -205,8 +166,6 @@ namespace ModTranslator
             InitializeComponent();
 
             InitMainWindow();
-
-            InitControlElementsHints();
 
             g_OptionsWindow = new SettingsWindow(this);
 
@@ -233,7 +192,7 @@ namespace ModTranslator
             g_SearchWindow.CloseWindow();
         }
 
-        private void DataTextChangedMessage()
+        public void DataTextChangedMessage()
         {
             if (g_DataHasBeenChanged && IsLoadedTextData())
             {
@@ -248,7 +207,7 @@ namespace ModTranslator
 
         public bool IsLoadedTextData()
         {
-            return (g_CurrentMainGridData.Count > 0);
+            return (g_CurrentMainGridData.Count > 0 && (!string.IsNullOrEmpty(g_CurrentOriginalFile)));
         }
 
         private void EnableControlButtons()
@@ -453,87 +412,7 @@ namespace ModTranslator
             return Result;
         }
 
-        /*
-        public class TranslationRecordMap : ClassMap<ModTextRow>
-        {
-            public TranslationRecordMap()
-            {
-                Map(m => m.RowId).Index(0);
-
-                Map(m => m.TranslatedText).Index(1);
-
-                Map(m => m.OriginalText).Index(2).Optional();
-            }
-        }
-
-        public static List<ModTextRow> ReadCsvFile(string FilePath)
-        {
-            try
-            {
-                var Separator = DetectCsvFileSeparator(FilePath).ToString();
-
-                if (Separator != null)
-                {
-                    using (var FileReader = new StreamReader(FilePath))
-                    {
-                        var CsvConfig = new CsvConfiguration(CultureInfo.InvariantCulture);
-
-                        CsvConfig.Delimiter = Separator;
-
-                        CsvConfig.HasHeaderRecord = false;
-
-                        CsvConfig.MissingFieldFound = null;
-
-                        CsvConfig.BadDataFound = null;
-
-                        using (var Csv = new CsvHelper.CsvReader(FileReader, CsvConfig))
-                        {
-                            Csv.Context.RegisterClassMap<TranslationRecordMap>();
-
-                            return Csv.GetRecords<ModTextRow>().ToList();
-                        }
-                    }
-                }
-                return new List<ModTextRow>();
-            }
-            catch (Exception)
-            {
-                return new List<ModTextRow>();
-            }
-        }
-
-        public static List<ModTextRow> ReadCsvFile(string FileName)
-        {
-            var Result = new List<ModTextRow>();
-
-            try
-            {
-                string[] FileLines = File.ReadAllLines(FileName, Encoding.UTF8);
-
-                foreach (string Line in FileLines)
-                {
-                    var SplitLine = Line.Split('|', StringSplitOptions.RemoveEmptyEntries);
-
-                    if (SplitLine.Length > 1)
-                    {
-                        Result.Add(
-                            new ModTextRow
-                            {
-                                RowId = SplitLine[0],
-                                TranslatedText = SplitLine[1]
-                            });
-                    }
-                }
-                return Result;
-            }
-            catch (Exception)
-            {
-                return Result;
-            }
-        }
-        */
-
-        private List<ModTextRow>? ProcessOriginalFiles(string FilePath)
+        public List<ModTextRow>? ProcessOriginalFiles(string FilePath)
         {
             if (!File.Exists(FilePath))
                 return null;
@@ -571,7 +450,7 @@ namespace ModTranslator
                             Result = LoadAndParseItemModifiersFile(FilePath);
                             break;
                         }
-                    case "menus.txt": // Есть проблемы: в файле содержатся часто содержатся одинаковые id, но имеют разное значение.
+                    case "menus.txt": // Есть проблемы: в файле ингода содержатся одинаковые id, но имеют разное значение.
                         {
                             Result = LoadAndParseMenuFile(FilePath);
                             break;
@@ -627,7 +506,7 @@ namespace ModTranslator
             return Result;
         }
 
-        private bool ProcessAndLoadOriginalFiles(string FilePath)
+        public bool ProcessAndLoadOriginalFiles(string FilePath)
         {
             if (!File.Exists(FilePath))
                 return false;
@@ -1190,7 +1069,7 @@ namespace ModTranslator
             }
         }
 
-        private void Button_Click(object sender, RoutedEventArgs e)
+        private void OpenModButton_Click(object sender, RoutedEventArgs e)
         {
             var FolderDialog = new OpenFolderDialog();
 
@@ -1599,16 +1478,6 @@ namespace ModTranslator
             Window.Owner = this;
         }
 
-        private void MainDataGrid_LoadingRow(object? sender, DataGridRowEventArgs e)
-        {
-            //e.Row.Header = (e.Row.GetIndex() + 1).ToString();
-        }
-
-        private void MainDataGrid_Sorting(object sender, DataGridSortingEventArgs e)
-        {
-            e.Handled = true;
-        }
-
         private void DataGridColumnHeader_Click(object sender, RoutedEventArgs e)
         {
             DataGridColumnHeader? Header = sender as DataGridColumnHeader;
@@ -1645,41 +1514,6 @@ namespace ModTranslator
                 }
             }
         }
-
-        /*
-        public static List<string> GetAllColumnText(DataGrid TableData, DataGridColumn Column)
-        {
-            var Result = new List<string>();
-
-            DataGridBoundColumn? BoundColumn = Column as DataGridBoundColumn;
-
-            if (BoundColumn == null)
-                return Result;
-
-            string? BindingPath = (BoundColumn.Binding as Binding)?.Path?.Path;
-
-            if (string.IsNullOrEmpty(BindingPath))
-                return Result;
-
-            foreach (var Item in TableData.Items)
-            {
-                if (Item == CollectionView.NewItemPlaceholder) // хз зачем это.
-                    continue;
-
-                var Property = Item.GetType().GetProperty(BindingPath);
-
-                var Value = Property?.GetValue(Item, null);
-
-                if (Value != null)
-                {
-                    var StringValue = Value.ToString();
-
-                    Result.Add(StringValue ?? string.Empty);
-                }
-            }
-            return Result;
-        }
-        */
 
         public static List<string> GetAllColumnText(DataGrid TableData, DataGridColumn Column)
         {

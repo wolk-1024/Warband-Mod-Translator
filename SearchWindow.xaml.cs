@@ -22,8 +22,6 @@ namespace WarbandSearch
 
             this.WindowStartupLocation = WindowStartupLocation.CenterScreen;
 
-            this.CheckFullSearch.ToolTip = "Поиск слова целиком";
-
             this.Closing += SearchWindow_Closing;
         }
 
@@ -54,18 +52,6 @@ namespace WarbandSearch
 
             MainWindow = Window;
         }
-
-        /*
-        public bool SearchCellByValueNext(string Value)
-        {
-            return false;
-        }
-
-        public bool SearchCellByValuePrev(string Value)
-        {
-            return false;
-        }
-        */
 
         private void ButtonSearch_Click(object sender, RoutedEventArgs e)
         {

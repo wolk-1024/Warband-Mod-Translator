@@ -7,7 +7,10 @@ namespace ModTranslatorSettings
 {
     public partial class SettingsWindow : Window
     {
-        private MainTranslatorWindow MainWindow;
+        /// <summary>
+        /// Главное окно.
+        /// </summary>
+        private MainTranslatorWindow g_MainWindow;
 
         private bool g_HideWindow = true;
 
@@ -22,14 +25,6 @@ namespace ModTranslatorSettings
             this.WindowStartupLocation = WindowStartupLocation.CenterScreen;
 
             this.Closing += SettingsWindow_Closing;
-
-            ShowID.Unchecked += ShowID_Unchecked;
-
-            ShowID.Checked += ShowID_Checked;
-
-            FreeExport.ToolTip = "При экспорте в .csv заменять непереведённые строки на оригинальный текст.";
-
-            ImportLog.ToolTip = "Запись в файл несоответствий строк импорта и загруженного оригинала.";
         }
 
         public SettingsWindow(MainTranslatorWindow Window)
@@ -38,7 +33,7 @@ namespace ModTranslatorSettings
 
             InitSettingsWindow();
 
-            MainWindow = Window;
+            g_MainWindow = Window;
         }
 
         public void CloseWindow()
@@ -62,18 +57,49 @@ namespace ModTranslatorSettings
 
         private void ShowID_Checked(object sender, RoutedEventArgs e)
         {
-            if (ShowID.IsChecked == true && MainWindow != null)
+            if (ShowID.IsChecked == true && g_MainWindow != null)
             {
-                MainWindow.SetColumnVisibility("ID", Visibility.Visible);
+                g_MainWindow.SetColumnVisibility("ID", Visibility.Visible);
             }
         }
 
         private void ShowID_Unchecked(object sender, RoutedEventArgs e)
         {
-            if (ShowID.IsChecked == false && MainWindow != null)
+            if (ShowID.IsChecked == false && g_MainWindow != null)
             {
-                MainWindow.SetColumnVisibility("ID", Visibility.Collapsed);
+                g_MainWindow.SetColumnVisibility("ID", Visibility.Collapsed);
             }
         }
+
+        private void ShowDubsID_Checked(object sender, RoutedEventArgs e)
+        {
+            if (ShowDubsID.IsChecked == true && g_MainWindow != null)
+            {
+                Parser.g_DeleteDublicatesIDs = false;
+
+                if (g_MainWindow.IsLoadedTextData())
+                {
+                    g_MainWindow.DataTextChangedMessage();
+
+                    g_MainWindow.ProcessAndLoadOriginalFiles(g_MainWindow.g_CurrentOriginalFile);
+                }
+            }
+        }
+
+        private void ShowDubsID_Unchecked(object sender, RoutedEventArgs e)
+        {
+            if (ShowID.IsChecked == true && g_MainWindow != null)
+            {
+                Parser.g_DeleteDublicatesIDs = true;
+
+                if (g_MainWindow.IsLoadedTextData())
+                {
+                    g_MainWindow.DataTextChangedMessage();
+
+                    g_MainWindow.ProcessAndLoadOriginalFiles(g_MainWindow.g_CurrentOriginalFile);
+                }
+            }
+        }
+
     }
 }
