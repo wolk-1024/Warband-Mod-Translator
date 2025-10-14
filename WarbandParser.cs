@@ -174,7 +174,7 @@ namespace WarbandParser
             return Data;
         }
 
-        public static List<ModTextRow> RemoveDuplicateIDs(List<ModTextRow> Data, out int DuplicatesRemoved)
+        public static List<ModTextRow> RemoveDublicateIDs(List<ModTextRow> Data, out int DuplicatesRemoved)
         {
             DuplicatesRemoved = 0;
 
@@ -341,7 +341,7 @@ namespace WarbandParser
                 {
                     int RemovedIds;
 
-                    var Result = RemoveDuplicateIDs(ModTextResult, out RemovedIds);
+                    var Result = RemoveDublicateIDs(ModTextResult, out RemovedIds);
 
                     return UpdateNumber(Result);
                 }
@@ -389,7 +389,7 @@ namespace WarbandParser
                 {
                     int RemovedIds;
 
-                    var Result = RemoveDuplicateIDs(ModTextResult, out RemovedIds);
+                    var Result = RemoveDublicateIDs(ModTextResult, out RemovedIds);
 
                     return UpdateNumber(Result);
                 }
@@ -447,7 +447,7 @@ namespace WarbandParser
                 {
                     int RemovedIds;
 
-                    var Result = RemoveDuplicateIDs(ModTextResult, out RemovedIds);
+                    var Result = RemoveDublicateIDs(ModTextResult, out RemovedIds);
 
                     return UpdateNumber(Result);
                 }
@@ -508,7 +508,7 @@ namespace WarbandParser
                 {
                     int RemovedIds;
 
-                    var Result = RemoveDuplicateIDs(ModTextResult, out RemovedIds);
+                    var Result = RemoveDublicateIDs(ModTextResult, out RemovedIds);
 
                     return UpdateNumber(Result);
                 }
@@ -556,7 +556,7 @@ namespace WarbandParser
                 {
                     int RemovedIds;
 
-                    var Result = RemoveDuplicateIDs(ModTextResult, out RemovedIds);
+                    var Result = RemoveDublicateIDs(ModTextResult, out RemovedIds);
 
                     return UpdateNumber(Result);
                 }
@@ -643,7 +643,7 @@ namespace WarbandParser
                 {
                     int RemovedIds;
 
-                    var Result = RemoveDuplicateIDs(ModTextResult, out RemovedIds);
+                    var Result = RemoveDublicateIDs(ModTextResult, out RemovedIds);
 
                     return UpdateNumber(Result);
                 }
@@ -691,7 +691,7 @@ namespace WarbandParser
                 {
                     int RemovedIds;
 
-                    var Result = RemoveDuplicateIDs(ModTextResult, out RemovedIds);
+                    var Result = RemoveDublicateIDs(ModTextResult, out RemovedIds);
 
                     return UpdateNumber(Result);
                 }
@@ -739,7 +739,7 @@ namespace WarbandParser
                 {
                     int RemovedIds;
 
-                    var Result = RemoveDuplicateIDs(ModTextResult, out RemovedIds);
+                    var Result = RemoveDublicateIDs(ModTextResult, out RemovedIds);
 
                     return UpdateNumber(Result);
                 }
@@ -801,7 +801,7 @@ namespace WarbandParser
                 {
                     int RemovedIds;
 
-                    var Result = RemoveDuplicateIDs(ModTextResult, out RemovedIds);
+                    var Result = RemoveDublicateIDs(ModTextResult, out RemovedIds);
 
                     return UpdateNumber(Result);
                 }
@@ -849,7 +849,7 @@ namespace WarbandParser
                 {
                     int RemovedIds;
 
-                    var Result = RemoveDuplicateIDs(ModTextResult, out RemovedIds);
+                    var Result = RemoveDublicateIDs(ModTextResult, out RemovedIds);
 
                     return UpdateNumber(Result);
                 }
@@ -908,7 +908,7 @@ namespace WarbandParser
                 {
                     int RemovedIds;
 
-                    var Result = RemoveDuplicateIDs(ModTextResult, out RemovedIds);
+                    var Result = RemoveDublicateIDs(ModTextResult, out RemovedIds);
 
                     return UpdateNumber(Result);
                 }
@@ -954,7 +954,7 @@ namespace WarbandParser
                 {
                     int RemovedIds;
 
-                    var Result = RemoveDuplicateIDs(ModTextResult, out RemovedIds);
+                    var Result = RemoveDublicateIDs(ModTextResult, out RemovedIds);
 
                     return UpdateNumber(Result);
                 }
@@ -1002,7 +1002,7 @@ namespace WarbandParser
                 {
                     int RemovedIds;
 
-                    var Result = RemoveDuplicateIDs(ModTextResult, out RemovedIds);
+                    var Result = RemoveDublicateIDs(ModTextResult, out RemovedIds);
 
                     return UpdateNumber(Result);
                 }
@@ -1066,7 +1066,7 @@ namespace WarbandParser
                 {
                     int RemovedIds;
 
-                    var Result = RemoveDuplicateIDs(ModTextResult, out RemovedIds);
+                    var Result = RemoveDublicateIDs(ModTextResult, out RemovedIds);
 
                     return UpdateNumber(Result);
                 }

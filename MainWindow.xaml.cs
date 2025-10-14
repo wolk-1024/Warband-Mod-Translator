@@ -1680,5 +1680,9 @@ namespace ModTranslator
             e.Handled = true; // Не трогать
         }
 
+        private void MainDataGrid_LoadingRow(object sender, DataGridRowEventArgs e)
+        {
+          //
+        }
     }
 }
