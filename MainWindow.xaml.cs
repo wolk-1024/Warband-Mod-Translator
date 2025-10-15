@@ -628,7 +628,7 @@ namespace ModTranslator
             return string.Empty;
         }
 
-        /// <returns>Вернёт null, если ничего не найдёт или ошибке.</returns>
+        /// <returns>Вернёт null, если ничего не найдёт или ошибка.</returns>
         public static string? GetCellStringValue(DataGrid Table, int RowIndex, int ColumnIndex, bool OnlyVisible = true)
         {
             var Row = Table.Items[RowIndex] as ModTextRow;
@@ -871,7 +871,7 @@ namespace ModTranslator
 
                             string NewLine = TextData.RowId + "|" + ResultTranlatedText;
 
-                            WriteText.WriteLine(NewLine.TrimEnd()); // Нужно ли удалять пробелы в конце строки?
+                            WriteText.WriteLine(NewLine);
                         }
                     }
                 }
@@ -1095,7 +1095,7 @@ namespace ModTranslator
         /// 
         /// </summary>
         /// 
-        /// <param name="Table"></param>
+        /// <param name="DataTable"></param>
         /// <param name="Value"></param>
         /// <param name="StartRow">Стартовый индекс строки от которой будет идти поиск</param>
         /// <param name="FullSearch">Поиск строки целиком, а не по первому вхождению.</param>
@@ -1679,15 +1679,21 @@ namespace ModTranslator
 
                         if (ColumnIndex >= 0)
                         {
-                            for (int i = 0; i < AllLines.Length; i++)
+                            int LineIndex = 0, ItemCount = 0;
+
+                            while ((ItemCount < MainDataGrid.Items.Count) && (LineIndex < AllLines.Length))
                             {
-                                var RowData = GetRowDataByIndex(i);
+                                var RowData = GetRowDataByIndex(ItemCount);
 
                                 if (RowData != null && IsVisibleRow(RowData))
                                 {
-                                    SetCellValue(TableGrid, i, ColumnIndex, AllLines[i]);
+                                    SetCellValue(TableGrid, ItemCount, ColumnIndex, AllLines[LineIndex]);
+
+                                    LineIndex++;
                                 }
+                                ItemCount++;
                             }
+
                             TableGrid.Items.Refresh(); // Обновляем табличку.
 
                             SetTranslateCountLabel();
@@ -1771,9 +1777,7 @@ namespace ModTranslator
             var Column = e.Column;
 
             if (Column.SortDirection == null)
-            {
                 Column.SortDirection = ListSortDirection.Ascending;
-            }
         }
 
         private void MainDataGrid_LoadingRow(object sender, DataGridRowEventArgs e)
@@ -1785,13 +1789,9 @@ namespace ModTranslator
             if (ModText != null)
             {
                 if (!IsVisibleRow(ModText)) // Если строка помечена.
-                {
                     RowData.Visibility = Visibility.Collapsed;  // скрываем ее
-                }
                 else
-                {
                     RowData.Visibility = Visibility.Visible;
-                }
             }
         }
 

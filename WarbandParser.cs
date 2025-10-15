@@ -394,7 +394,7 @@ namespace WarbandParser
                 {
                     var InfoArgs = GetModTextArgs(InfoLine, "ip_", 3);
 
-                    if (InfoArgs.Count < 3) //
+                    if (InfoArgs.Count < 2)
                         continue;
 
                     string OldID = InfoArgs[0];
@@ -403,10 +403,6 @@ namespace WarbandParser
                         return null;
 
                     string IpValue = InfoArgs[1].Replace("_", " ");
-
-                    string IpText = InfoArgs[2].Replace("_", " ");
-
-                    string NewID = OldID + "_text"; // ip_name + _text
 
                     var NewFlags = IsBlockedLine(IpValue) ? RowFlags.BlockSymbol : RowFlags.None;
 
@@ -418,15 +414,22 @@ namespace WarbandParser
                             Flags = NewFlags
                         });
 
-                    var TextFlags = IsBlockedLine(IpText) ? RowFlags.BlockSymbol : RowFlags.None;
+                    if (InfoArgs.Count == 3)
+                    {
+                        string IpText = InfoArgs[2].Replace("_", " ");
 
-                    ModTextResult.Add(
-                        new ModTextRow
-                        {
-                            RowId = NewID,
-                            OriginalText = IpText,
-                            Flags = TextFlags
-                        });
+                        string NewID = OldID + "_text"; // ip_name + _text
+
+                        var TextFlags = IsBlockedLine(IpText) ? RowFlags.BlockSymbol : RowFlags.None;
+
+                        ModTextResult.Add(
+                            new ModTextRow
+                            {
+                                RowId = NewID,
+                                OriginalText = IpText,
+                                Flags = TextFlags
+                            });
+                    }
                 }
                 return MarkDuplicateIDs(ModTextResult);
             }
@@ -700,7 +703,7 @@ namespace WarbandParser
                 {
                     var QuestArgs = GetModTextArgs(QuestLine, "qst_", 3);
 
-                    if (QuestArgs.Count < 3) //
+                    if (QuestArgs.Count < 2)
                         continue;
 
                     string OldID = QuestArgs[0];
@@ -709,10 +712,6 @@ namespace WarbandParser
                         return null;
 
                     string Quest = QuestArgs[1].Replace("_", " ");
-
-                    string QuestText = QuestArgs[2].Replace("_", " ");
-
-                    string NewID = OldID + "_text";
 
                     var NewFlags = IsBlockedLine(Quest) ? RowFlags.BlockSymbol : RowFlags.None;
 
@@ -724,15 +723,22 @@ namespace WarbandParser
                             Flags = NewFlags
                         });
 
-                    var TextFlags = IsBlockedLine(QuestText) ? RowFlags.BlockSymbol : RowFlags.None;
+                    if (QuestArgs.Count == 3)
+                    {
+                        string QuestText = QuestArgs[2].Replace("_", " ");
 
-                    ModTextResult.Add(
-                        new ModTextRow
-                        {
-                            RowId = NewID,
-                            OriginalText = QuestText,
-                            Flags = TextFlags
-                        });
+                        string NewID = OldID + "_text";
+
+                        var TextFlags = IsBlockedLine(QuestText) ? RowFlags.BlockSymbol : RowFlags.None;
+
+                        ModTextResult.Add(
+                            new ModTextRow
+                            {
+                                RowId = NewID,
+                                OriginalText = QuestText,
+                                Flags = TextFlags
+                            });
+                    }
                 }
                 return MarkDuplicateIDs(ModTextResult);
             }
