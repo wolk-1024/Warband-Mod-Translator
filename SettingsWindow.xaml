@@ -6,16 +6,18 @@
         xmlns:local="clr-namespace:ModTranslatorSettings"
         mc:Ignorable="d"
         Title="Настройки" Height="300" Width="300">
-    
+
     <Grid>
-        
+
         <CheckBox x:Name="ShowID" Content="Показать столбец ID" HorizontalAlignment="Left" Margin="15,25,0,0" VerticalAlignment="Top" Width="151" IsChecked="True" Unchecked ="ShowID_Unchecked" Checked ="ShowID_Checked"/>
 
         <CheckBox x:Name="FreeExport" Content="Замена пустых строк при экспорте" ToolTip="При экспорте в .csv заменять непереведённые строки на оригинальный текст." HorizontalAlignment="Left" Margin="15,50,0,0" VerticalAlignment="Top" Width="220"/>
 
         <CheckBox x:Name="ImportLog" Content="Запись неудачного импорта" ToolTip="Запись в файл несоответствий строк импорта и загруженного оригинала." HorizontalAlignment="Left" Margin="15,75,0,0" VerticalAlignment="Top" Width="185" IsChecked="True"/>
 
-        <CheckBox x:Name="ShowDubsID" Content="Не удалять дубликаты ID" Margin="15,100,0,0" VerticalAlignment="Top" HorizontalAlignment="Left" Width="200" IsChecked="False" Checked="ShowDubsID_Checked" Unchecked ="ShowDubsID_Unchecked"/>
+        <CheckBox x:Name="ShowDubsID" Content="Отображать дубликаты ID" Margin="15,100,0,0" VerticalAlignment="Top" HorizontalAlignment="Left" Width="200" IsChecked="False" Checked="ShowDubsID_Checked" Unchecked ="ShowDubsID_Unchecked"/>
+
+        <CheckBox x:Name="ShowBlocksymbols" Content="Отображать строки с {!} символом" ToolTip="Строки, которые не будут отображены в игре помечаются символом {!}"  HorizontalAlignment="Left" Margin="15,125,0,0" VerticalAlignment="Top" Width="240" Checked="ShowBlocksymbols_Checked" Unchecked="ShowBlocksymbols_Unchecked"/>
 
     </Grid>
 </Window>

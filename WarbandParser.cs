@@ -15,6 +15,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 
 using EncodingTextFile;
+using static ModTranslator.MainTranslatorWindow;
 
 namespace WarbandParser
 {
@@ -26,6 +27,11 @@ namespace WarbandParser
         public static bool g_DeleteDublicatesIDs = true;
 
         /// <summary>
+        /// Игнорирование {!} в строках. Не трогать.
+        /// </summary>
+        public static bool g_IgnoreBlockingSymbol = false;
+
+        /// <summary>
         /// Регулярка для поиска знаков и цифр.
         /// </summary>
         private static readonly Regex RegSymbolsAndNumbers = new Regex(@"^[^\p{L}]*$", RegexOptions.Compiled);
@@ -34,11 +40,6 @@ namespace WarbandParser
         /// Регулярка для слов и знаков
         /// </summary>
         private static readonly Regex RegWordsAndSymbols = new Regex(@"^(?=.*\p{L})[\p{L}\p{N}\p{P}\p{S}]+$", RegexOptions.Compiled);
-
-        /// <summary>
-        /// Игнорирование {!} в строках. Не трогать.
-        /// </summary>
-        private static bool g_IgnoreBlockingSymbol = false;
 
         private readonly static string[] IdPrefixesList =
         {
@@ -60,6 +61,15 @@ namespace WarbandParser
             "ui_"       // ui
         };
 
+        [Flags]
+        public enum RowFlags
+        {
+            None = 0,
+            Dublicate = 1,
+            BlockSymbol = 2,
+            DublicateAndBlockSymbol = Dublicate | BlockSymbol
+        }
+
         public class ModTextRow
         {
             public string RowNum { get; set; } = string.Empty;
@@ -69,6 +79,8 @@ namespace WarbandParser
             public string OriginalText { get; set; } = string.Empty;
 
             public string TranslatedText { get; set; } = string.Empty;
+
+            public RowFlags Flags { get; set; } = RowFlags.None;
         }
 
         public static bool IsLineStartsWithPrefix(string Input)
@@ -127,11 +139,8 @@ namespace WarbandParser
         }
         */
 
-        private static bool TextStartWithError(string Input)
+        private static bool IsBlockedLine(string Input)
         {
-            if (g_IgnoreBlockingSymbol == true)
-                return false;
-
             if (!string.IsNullOrEmpty(Input))
             {
                 var Result = Input.TrimStart(); // Иногда блок стоит не в самом конце, а его разделяют пробелы.
@@ -163,17 +172,8 @@ namespace WarbandParser
             }
             return false;
         }
-
-        private static List<ModTextRow> UpdateNumber(List<ModTextRow> Data)
-        {
-            int Count = 1;
-
-            foreach (var Res in Data)
-                Res.RowNum = Count++.ToString();
-
-            return Data;
-        }
-
+        
+        /*
         public static List<ModTextRow> RemoveDublicateIDs(List<ModTextRow> Data, out int DuplicatesRemoved)
         {
             DuplicatesRemoved = 0;
@@ -198,6 +198,7 @@ namespace WarbandParser
             }
             return Result;
         }
+        */
 
         private static bool IsWordCharacter(char c)
         {
@@ -278,8 +279,6 @@ namespace WarbandParser
             {
                 string TextData = EncodingText.ReadTextFileAndConvertTo(FilePath, Encoding.Unicode);
 
-                //string TextData = File.ReadAllText(FilePath, Encoding.UTF8);
-
                 if (TextData.Length > 0)
                     Result = ParseTextData(TextData, Prefix);
             }
@@ -326,28 +325,17 @@ namespace WarbandParser
                     if (OriginalText == "NO VOICEOVER")
                         continue;
 
-                    if (!TextStartWithError(OriginalText))
+                    var NewFlags = IsBlockedLine(OriginalText) == true ? RowFlags.BlockSymbol : RowFlags.None;
+
+                    ModTextResult.Add(new ModTextRow
                     {
-                        ModTextResult.Add(
-                            new ModTextRow
-                            {
-                                RowId = LineID,
-                                OriginalText = OriginalText
-                            });
-                    }
-
+                        RowId = LineID,
+                        OriginalText = OriginalText,
+                        Flags = NewFlags
+                    });
                 }
-                if (g_DeleteDublicatesIDs)
-                {
-                    int RemovedIds;
-
-                    var Result = RemoveDublicateIDs(ModTextResult, out RemovedIds);
-
-                    return UpdateNumber(Result);
-                }
-                return UpdateNumber(ModTextResult);
+                return MarkDuplicateIDs(ModTextResult);
             }
-
             return null;
         }
 
@@ -382,18 +370,11 @@ namespace WarbandParser
                         new ModTextRow
                         {
                             RowId = LineID,
-                            OriginalText = OriginalText
+                            OriginalText = OriginalText,
+                            Flags = RowFlags.None
                         });
                 }
-                if (g_DeleteDublicatesIDs)
-                {
-                    int RemovedIds;
-
-                    var Result = RemoveDublicateIDs(ModTextResult, out RemovedIds);
-
-                    return UpdateNumber(Result);
-                }
-                return UpdateNumber(ModTextResult);
+                return MarkDuplicateIDs(ModTextResult);
             }
             return null;
         }
@@ -427,31 +408,27 @@ namespace WarbandParser
 
                     string NewID = OldID + "_text"; // ip_name + _text
 
-                    if (!TextStartWithError(IpValue))
-                    {
-                        ModTextResult.Add(
-                            new ModTextRow{
-                                RowId = OldID, 
-                                OriginalText = IpValue
-                            });
+                    var NewFlags = IsBlockedLine(IpValue) ? RowFlags.BlockSymbol : RowFlags.None;
 
-                        ModTextResult.Add(
-                            new ModTextRow
-                            {
-                                RowId = NewID,
-                                OriginalText = IpText
-                            });
-                    }
+                    ModTextResult.Add(
+                        new ModTextRow
+                        {
+                            RowId = OldID,
+                            OriginalText = IpValue,
+                            Flags = NewFlags
+                        });
+
+                    var TextFlags = IsBlockedLine(IpText) ? RowFlags.BlockSymbol : RowFlags.None;
+
+                    ModTextResult.Add(
+                        new ModTextRow
+                        {
+                            RowId = NewID,
+                            OriginalText = IpText,
+                            Flags = TextFlags
+                        });
                 }
-                if (g_DeleteDublicatesIDs)
-                {
-                    int RemovedIds;
-
-                    var Result = RemoveDublicateIDs(ModTextResult, out RemovedIds);
-
-                    return UpdateNumber(Result);
-                }
-                return UpdateNumber(ModTextResult);
+                return MarkDuplicateIDs(ModTextResult);
             }
             return null;
         }
@@ -487,32 +464,25 @@ namespace WarbandParser
 
                     //ItemNamePlural += " (plural)";
 
-                    if (!TextStartWithError(ItemName))
-                    {
-                        ModTextResult.Add(
-                            new ModTextRow
-                            {
-                                RowId = OldID,
-                                OriginalText = ItemName
-                            });
+                    var NewFlags = IsBlockedLine(ItemName) ? RowFlags.BlockSymbol : RowFlags.None;
 
-                        ModTextResult.Add(
-                            new ModTextRow
-                            {
-                                RowId = NewID,
-                                OriginalText = ItemNamePlural
-                            });
-                    }
+                    ModTextResult.Add(
+                        new ModTextRow
+                        {
+                            RowId = OldID,
+                            OriginalText = ItemName,
+                            Flags = NewFlags
+                        });
+
+                    ModTextResult.Add(
+                        new ModTextRow
+                        {
+                            RowId = NewID,
+                            OriginalText = ItemNamePlural,
+                            Flags = NewFlags
+                        });
                 }
-                if (g_DeleteDublicatesIDs)
-                {
-                    int RemovedIds;
-
-                    var Result = RemoveDublicateIDs(ModTextResult, out RemovedIds);
-
-                    return UpdateNumber(Result);
-                }
-                return UpdateNumber(ModTextResult);
+                return MarkDuplicateIDs(ModTextResult);
             }
             return null;
         }
@@ -542,25 +512,17 @@ namespace WarbandParser
 
                     string OriginalText = ItemModArgs[1].Replace("_", " ");
 
-                    if (!TextStartWithError(OriginalText))
-                    {
-                        ModTextResult.Add(
-                            new ModTextRow
-                            {
-                                RowId = LineID,
-                                OriginalText = OriginalText
-                            });
-                    }
-                }
-                if (g_DeleteDublicatesIDs)
-                {
-                    int RemovedIds;
+                    var NewFlags = IsBlockedLine(OriginalText) ? RowFlags.BlockSymbol : RowFlags.None;
 
-                    var Result = RemoveDublicateIDs(ModTextResult, out RemovedIds);
-
-                    return UpdateNumber(Result);
+                    ModTextResult.Add(
+                        new ModTextRow
+                        {
+                            RowId = LineID,
+                            OriginalText = OriginalText,
+                            Flags = NewFlags
+                        });
                 }
-                return UpdateNumber(ModTextResult);
+                return MarkDuplicateIDs(ModTextResult);
             }
             return null;
         }
@@ -595,15 +557,15 @@ namespace WarbandParser
 
                     var MenuText = MenuArgs[1].Replace('_', ' ');
 
-                    if (!TextStartWithError(MenuText))
-                    {
-                        ModTextResult.Add(
-                            new ModTextRow
-                            {
-                                RowId = MenuID,
-                                OriginalText = MenuText
-                            });
-                    }
+                    var NewFlags = IsBlockedLine(MenuText) ? RowFlags.BlockSymbol : RowFlags.None;
+
+                    ModTextResult.Add(
+                        new ModTextRow
+                        {
+                            RowId = MenuID,
+                            OriginalText = MenuText,
+                            Flags = NewFlags
+                        });
 
                     var PartsOfMenu = ParseTextData(FullMenuLine, "mno_");
 
@@ -625,29 +587,20 @@ namespace WarbandParser
 
                             var PartText = PartMenuArgs[1].Replace('_', ' ');
 
-                            if (!TextStartWithError(PartText))
-                            {
-                                MnoList.Add(
-                                    new ModTextRow
-                                    {
-                                        RowId = PartID,
-                                        OriginalText = PartText
-                                    });
-                            }
+                            var PartFlags = IsBlockedLine(PartText) ? RowFlags.BlockSymbol : RowFlags.None;
+
+                            MnoList.Add(
+                                new ModTextRow
+                                {
+                                    RowId = PartID,
+                                    OriginalText = PartText,
+                                    Flags = PartFlags
+                                });
                         }
-                        // Где-то тут должна быть работа с дубликатами подменю.
                         ModTextResult.AddRange(MnoList);
                     }
                 }
-                if (g_DeleteDublicatesIDs)
-                {
-                    int RemovedIds;
-
-                    var Result = RemoveDublicateIDs(ModTextResult, out RemovedIds);
-
-                    return UpdateNumber(Result);
-                }
-                return UpdateNumber(ModTextResult);
+                return MarkDuplicateIDs(ModTextResult);
             }
             return null;
         }
@@ -677,25 +630,17 @@ namespace WarbandParser
 
                     string OriginalText = PartiesArgs[1].Replace("_", " ");
 
-                    if (!TextStartWithError(OriginalText))
-                    {
-                        ModTextResult.Add(
-                            new ModTextRow
-                            {
-                                RowId = ID,
-                                OriginalText = OriginalText
-                            });
-                    }
-                }
-                if (g_DeleteDublicatesIDs)
-                {
-                    int RemovedIds;
+                    var NewFlags = IsBlockedLine(OriginalText) ? RowFlags.BlockSymbol : RowFlags.None;
 
-                    var Result = RemoveDublicateIDs(ModTextResult, out RemovedIds);
-
-                    return UpdateNumber(Result);
+                    ModTextResult.Add(
+                        new ModTextRow
+                        {
+                            RowId = ID,
+                            OriginalText = OriginalText,
+                            Flags = NewFlags
+                        });
                 }
-                return UpdateNumber(ModTextResult);
+                return MarkDuplicateIDs(ModTextResult);
             }
             return null;
         }
@@ -725,25 +670,17 @@ namespace WarbandParser
 
                     string OriginalText = PartyTempArgs[1].Replace("_", " ");
 
-                    if (!TextStartWithError(OriginalText))
-                    {
-                        ModTextResult.Add(
-                            new ModTextRow
-                            {
-                                RowId = LineID,
-                                OriginalText = OriginalText
-                            });
-                    }
-                }
-                if (g_DeleteDublicatesIDs)
-                {
-                    int RemovedIds;
+                    var NewFlags = IsBlockedLine(OriginalText) ? RowFlags.BlockSymbol : RowFlags.None;
 
-                    var Result = RemoveDublicateIDs(ModTextResult, out RemovedIds);
-
-                    return UpdateNumber(Result);
+                    ModTextResult.Add(
+                        new ModTextRow
+                        {
+                            RowId = LineID,
+                            OriginalText = OriginalText,
+                            Flags = NewFlags
+                        });
                 }
-                return UpdateNumber(ModTextResult);
+                return MarkDuplicateIDs(ModTextResult);
             }
             return null;
         }
@@ -777,35 +714,27 @@ namespace WarbandParser
 
                     string NewID = OldID + "_text";
 
-                    if (!TextStartWithError(Quest))
-                    {
-                        ModTextResult.Add(
-                            new ModTextRow
-                            {
-                                RowId = OldID,
-                                OriginalText = Quest
-                            });
-                    }
+                    var NewFlags = IsBlockedLine(Quest) ? RowFlags.BlockSymbol : RowFlags.None;
 
-                    if (!TextStartWithError(QuestText))
-                    {
-                        ModTextResult.Add(
-                            new ModTextRow
-                            {
-                                RowId = NewID,
-                                OriginalText = QuestText
-                            });
-                    }
+                    ModTextResult.Add(
+                        new ModTextRow
+                        {
+                            RowId = OldID,
+                            OriginalText = Quest,
+                            Flags = NewFlags
+                        });
+
+                    var TextFlags = IsBlockedLine(QuestText) ? RowFlags.BlockSymbol : RowFlags.None;
+
+                    ModTextResult.Add(
+                        new ModTextRow
+                        {
+                            RowId = NewID,
+                            OriginalText = QuestText,
+                            Flags = TextFlags
+                        });
                 }
-                if (g_DeleteDublicatesIDs)
-                {
-                    int RemovedIds;
-
-                    var Result = RemoveDublicateIDs(ModTextResult, out RemovedIds);
-
-                    return UpdateNumber(Result);
-                }
-                return UpdateNumber(ModTextResult);
+                return MarkDuplicateIDs(ModTextResult);
             }
             return null;
         }
@@ -835,25 +764,17 @@ namespace WarbandParser
 
                     string OriginalText = QuickArgs[1].Replace("_", " ");
 
-                    if (!TextStartWithError(OriginalText))
-                    {
-                        ModTextResult.Add(
-                            new ModTextRow
-                            {
-                                RowId = LineID,
-                                OriginalText = OriginalText
-                            });
-                    }
-                }
-                if (g_DeleteDublicatesIDs)
-                {
-                    int RemovedIds;
+                    var NewFlags = IsBlockedLine(OriginalText) ? RowFlags.BlockSymbol : RowFlags.None;
 
-                    var Result = RemoveDublicateIDs(ModTextResult, out RemovedIds);
-
-                    return UpdateNumber(Result);
+                    ModTextResult.Add(
+                        new ModTextRow
+                        {
+                            RowId = LineID,
+                            OriginalText = OriginalText,
+                            Flags = NewFlags
+                        });
                 }
-                return UpdateNumber(ModTextResult);
+                return MarkDuplicateIDs(ModTextResult);
             }
             return null;
         }
@@ -893,28 +814,21 @@ namespace WarbandParser
                         new ModTextRow
                         {
                             RowId = OldID,
-                            OriginalText = SkillName
+                            OriginalText = SkillName,
+                            Flags = RowFlags.None
                         });
 
                     ModTextResult.Add(
                         new ModTextRow
                         {
                             RowId = NewID,
-                            OriginalText = SkillDescription
+                            OriginalText = SkillDescription,
+                            Flags = RowFlags.None
                         });
 
                 }
-                if (g_DeleteDublicatesIDs)
-                {
-                    int RemovedIds;
-
-                    var Result = RemoveDublicateIDs(ModTextResult, out RemovedIds);
-
-                    return UpdateNumber(Result);
-                }
-                return UpdateNumber(ModTextResult);
+                return MarkDuplicateIDs(ModTextResult);
             }
-
             return null;
         }
 
@@ -943,22 +857,17 @@ namespace WarbandParser
 
                     string Skins = SkinsArgs[1].Replace("_", " ");
 
+                    // Нужны проверки на блок?
+
                     ModTextResult.Add(
                         new ModTextRow
                         {
                             RowId = LineID,
-                            OriginalText = Skins
+                            OriginalText = Skins,
+                            Flags = RowFlags.None
                         });
                 }
-                if (g_DeleteDublicatesIDs)
-                {
-                    int RemovedIds;
-
-                    var Result = RemoveDublicateIDs(ModTextResult, out RemovedIds);
-
-                    return UpdateNumber(Result);
-                }
-                return UpdateNumber(ModTextResult);
+                return MarkDuplicateIDs(ModTextResult);
             }
             return null;
         }
@@ -988,25 +897,17 @@ namespace WarbandParser
 
                     string OriginalText = StrArgs[1].Replace("_", " ");
 
-                    if (!TextStartWithError(OriginalText))
-                    {
-                        ModTextResult.Add(
-                            new ModTextRow
-                            {
-                                RowId = LineID,
-                                OriginalText = OriginalText
-                            });
-                    }
-                }
-                if (g_DeleteDublicatesIDs)
-                {
-                    int RemovedIds;
+                    var NewFlags = IsBlockedLine(OriginalText) ? RowFlags.BlockSymbol : RowFlags.None;
 
-                    var Result = RemoveDublicateIDs(ModTextResult, out RemovedIds);
-
-                    return UpdateNumber(Result);
+                    ModTextResult.Add(
+                        new ModTextRow
+                        {
+                            RowId = LineID,
+                            OriginalText = OriginalText,
+                            Flags = NewFlags
+                        });
                 }
-                return UpdateNumber(ModTextResult);
+                return MarkDuplicateIDs(ModTextResult);
             }
             return null;
         }
@@ -1042,35 +943,25 @@ namespace WarbandParser
 
                     //TroopsNamePlural += " (plural)";
 
-                    if (!TextStartWithError(TroopsName))
-                    {
-                        ModTextResult.Add(
-                            new ModTextRow
-                            {
-                                RowId = OldID,
-                                OriginalText = TroopsName
-                            });
-                    }
+                    var NewFlags = IsBlockedLine(TroopsName) ? RowFlags.BlockSymbol : RowFlags.None;
 
-                    if (!TextStartWithError(TroopsNamePlural))
-                    {
-                        ModTextResult.Add(
-                            new ModTextRow
-                            {
-                                RowId = NewID,
-                                OriginalText = TroopsNamePlural
-                            });
-                    }
+                    ModTextResult.Add(
+                        new ModTextRow
+                        {
+                            RowId = OldID,
+                            OriginalText = TroopsName,
+                            Flags = NewFlags
+                        });
+
+                    ModTextResult.Add(
+                        new ModTextRow
+                        {
+                            RowId = NewID,
+                            OriginalText = TroopsNamePlural,
+                            Flags = NewFlags
+                        });
                 }
-                if (g_DeleteDublicatesIDs)
-                {
-                    int RemovedIds;
-
-                    var Result = RemoveDublicateIDs(ModTextResult, out RemovedIds);
-
-                    return UpdateNumber(Result);
-                }
-                return UpdateNumber(ModTextResult);
+                return MarkDuplicateIDs(ModTextResult);
             }
             return null;
         }
@@ -1101,7 +992,7 @@ namespace WarbandParser
                     }
                 }
             }
-            return UpdateNumber(Result);
+            return Result;
         }
 
         public static bool IsNumber(string Input)
@@ -1166,7 +1057,7 @@ namespace WarbandParser
                 }
                 else if (RegSymbolsAndNumbers.IsMatch(Line)) // Если одни знаки и цифры.
                 {
-                    if (TextStartWithError(Line))
+                    if (IsBlockedLine(Line))
                     {
                         Result.Add(Line);
 
@@ -1183,6 +1074,84 @@ namespace WarbandParser
                 }
             }
             return Result;
+        }
+
+        static List<ModTextRow> GetDuplicateIDs(List<ModTextRow> ModText)
+        {
+            return ModText
+                .GroupBy(s => s.RowId)
+                .Where(g => g.Count() > 1)
+                .SelectMany(g => g.Skip(1))
+                .ToList();
+        }
+
+        static List<ModTextRow> DeleteMarkedIDs(List<ModTextRow> ModText, out int Removed)
+        {
+            Removed = 0;
+
+            var Result = new List<ModTextRow>();
+
+            foreach (var Row in ModText)
+            {
+                var Flags = Row.Flags;
+
+                if (Flags.HasFlag(RowFlags.Dublicate)) // Пропускаем дубликаты.
+                    continue;
+                else
+                    Result.Add(Row);
+            }
+            return Result;
+        }
+
+        static List<ModTextRow> MarkDuplicateIDs(List<ModTextRow> ModText)
+        {
+            var DuplicateGroups = ModText.GroupBy(x => x.RowId).Where(g => g.Count() > 1).ToList();
+
+            foreach (var Group in DuplicateGroups)
+            {
+                bool IsFirst = true;
+
+                foreach (var Item in Group)
+                {
+                    if (IsFirst)
+                    {
+                        IsFirst = false;
+
+                        continue;
+                    }
+                    Item.Flags |= RowFlags.Dublicate;
+                }
+            }
+            return ModText;
+        }
+
+        /// <summary>
+        /// Функция для проверки видимости строки.
+        /// </summary>
+        /// <param name="TextData"></param>
+        /// <returns>Вернёт true, если строка будет видна в таблице.</returns>
+        public static bool IsVisibleRow(ModTextRow TextData)
+        {
+            if (TextData != null)
+            {
+                var Flags = TextData.Flags;
+
+                if (Flags.HasFlag(RowFlags.Dublicate))
+                {
+                    if (Flags.HasFlag(RowFlags.Dublicate)) // Если дубликат
+                    {
+                        if (g_DeleteDublicatesIDs) // и мы их удаляем, то
+                            return false; // строка не видна.
+                    }
+                }
+                if (Flags.HasFlag(RowFlags.BlockSymbol)) // Если есть блокирующий символ {!}
+                {
+                    if (!g_IgnoreBlockingSymbol) // и мы НЕ игнорим их, то
+                        return false; // строка не видна.
+                }
+                // А если и дубликат и блок?
+            }
+            return true;
         }
 
     }

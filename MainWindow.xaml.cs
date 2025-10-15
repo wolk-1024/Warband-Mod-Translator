@@ -13,7 +13,9 @@
  */
 
 using Microsoft.Win32;
+using ModTranslatorSettings;
 using System.ComponentModel;
+using System.Data;
 using System.IO;
 using System.Reflection;
 using System.Text;
@@ -25,7 +27,6 @@ using System.Windows.Input;
 
 using WarbandAbout;
 using WarbandSearch;
-using ModTranslatorSettings;
 using static WarbandParser.Parser;
 
 //#nullable disable
@@ -85,12 +86,12 @@ namespace ModTranslator
         /// Для Warband ['|']
         /// Для Google Sheets [',']
         /// </summary>
-        public char[] g_CsvFileSeparators = { '|', ',' };
+        public static char[] g_CsvFileSeparators = { '|', ',' };
 
         /// <summary>
         /// Глобалка со списком замен знаков, которые искаженно отображаются в игре.
         /// </summary>
-        private readonly Dictionary<char, char> g_TextForbiddenChars = new Dictionary<char, char>
+        private static readonly Dictionary<char, char> g_TextForbiddenChars = new Dictionary<char, char>
         {
             { '—', '-' }
             //{ 'ё', 'е' },
@@ -109,11 +110,6 @@ namespace ModTranslator
         /// </summary>
         private readonly SearchWindow g_SearchWindow;
 
-        /// <summary>
-        /// Текущий столбец, выбранный правой кнокой мыши.
-        /// </summary>
-        //private DataGridColumn? g_CurrentColumn = null;
-
         public class TextImportInfo
         {
             public int SuccessLoaded { get; set; }
@@ -124,8 +120,9 @@ namespace ModTranslator
         /// <summary>
         /// Данные для FileBox
         /// </summary>
-        private readonly Dictionary<string, (string OriginalFile, string CsvFile)> g_BindingsFileNames = new Dictionary<string, (string, string)>
+        private static readonly Dictionary<string, (string OriginalFile, string CsvFile)> g_BindingsFileNames = new Dictionary<string, (string, string)>
         {
+            // Категории               Файлы мода             Файлы перевода
             { "Диалоги",             ("conversation.txt",    "dialogs.csv") },
             { "Фракции",             ("factions.txt",        "factions.csv") },
             { "Страницы информации", ("info_pages.txt",      "info_pages.csv") },
@@ -150,7 +147,7 @@ namespace ModTranslator
 
             this.Height = AppHeight;
 
-            this.WindowState = WindowState.Normal;
+            this.WindowState = WindowState.Maximized;
 
             this.WindowStartupLocation = WindowStartupLocation.CenterScreen;
 
@@ -205,7 +202,7 @@ namespace ModTranslator
 
         public bool IsLoadedTextData()
         {
-            return (g_CurrentMainGridData.Count > 0 && (!string.IsNullOrEmpty(g_CurrentOriginalFile)));
+            return (MainDataGrid.Items.Count > 0 && File.Exists(g_CurrentOriginalFile));
         }
 
         private void EnableControlButtons()
@@ -219,13 +216,11 @@ namespace ModTranslator
             SaveButton.IsEnabled = true;
         }
 
-        private void UnloadTableTextData()
+        private void UnloadMainGrid()
         {
             if (IsLoadedTextData())
             {
-                g_CurrentSelectedCell.RowIndex = -1;
-
-                g_CurrentSelectedCell.ColumnIndex = -1;
+                g_CurrentSelectedCell = (-1, -1);
 
                 g_FileForExport = string.Empty;
 
@@ -239,13 +234,51 @@ namespace ModTranslator
             }
         }
 
-        private void UpdateTableTextData(List<ModTextRow> TextData)
+        /// <summary>
+        /// Обновляет таблицу, подсчитывает видимые строки.
+        /// </summary>
+        /// <param name="TextData"></param>
+        private void RefreshMainGrid(List<ModTextRow> TextData)
         {
+            UpdateVisibleRowsNumbers(TextData);
+
+            g_CurrentSelectedCell = (-1, -1);
+
             g_CurrentMainGridData = TextData;
+
+            MainDataGrid.ItemsSource = null;
 
             MainDataGrid.ItemsSource = TextData;
 
             MainDataGrid.Items.Refresh();
+        }
+
+        public void RefreshMainGridAndSetCount()
+        {
+            RefreshMainGrid(g_CurrentMainGridData);
+
+            SetTranslateCountLabel();
+        }
+
+        /// <summary>
+        /// Нумерует только видимые строки.
+        /// </summary>
+        /// <param name="TextMod"></param>
+        public static void UpdateVisibleRowsNumbers(List<ModTextRow> TextMod)
+        {
+            var VisibleCount = 0;
+
+            foreach (var Row in TextMod)
+            {
+                Row.RowNum = string.Empty;
+
+                if (IsVisibleRow(Row))
+                {
+                    VisibleCount++;
+
+                    Row.RowNum = VisibleCount.ToString();
+                }
+            }
         }
 
         private static int CountFieldsOutsideQuotes(string TextLine, char Separator)
@@ -513,9 +546,9 @@ namespace ModTranslator
 
             if (LoadedData != null)
             {
-                UnloadTableTextData(); // Очищаем таблицу.
+                UnloadMainGrid(); // Очищаем таблицу.
 
-                UpdateTableTextData(LoadedData);
+                RefreshMainGrid(LoadedData);
 
                 SetTranslateCountLabel();
 
@@ -592,28 +625,37 @@ namespace ModTranslator
             return string.Empty;
         }
 
-
-        public static string? GetCellStringValue(DataGrid Table, int RowIndex, int ColumnIndex)
+        /// <returns>Вернёт null, если ничего не найдёт или ошибке.</returns>
+        public static string? GetCellStringValue(DataGrid Table, int RowIndex, int ColumnIndex, bool OnlyVisible = true)
         {
-            var Item = Table.Items[RowIndex];
+            var Row = Table.Items[RowIndex] as ModTextRow;
 
-            var Column = Table.Columns[ColumnIndex];
-
-            if (Column is DataGridBoundColumn BoundColumn)
+            if (Row != null)
             {
-                var Binding = BoundColumn.Binding as Binding;
-
-                if (Binding != null)
+                if (OnlyVisible)
                 {
-                    var PropertyInfo = Item.GetType().GetProperty(Binding.Path.Path);
-
-                    if (PropertyInfo == null)
+                    if (!IsVisibleRow(Row)) // Не ищем, если указано искать только видимые
                         return null;
+                }
 
-                    var Value = PropertyInfo.GetValue(Item);
+                var Column = Table.Columns[ColumnIndex];
 
-                    if (Value != null)
-                        return Value.ToString();
+                if (Column is DataGridBoundColumn BoundColumn)
+                {
+                    var Binding = BoundColumn.Binding as Binding;
+
+                    if (Binding != null)
+                    {
+                        var PropertyInfo = Row.GetType().GetProperty(Binding.Path.Path);
+
+                        if (PropertyInfo == null)
+                            return null;
+
+                        var Value = PropertyInfo.GetValue(Row);
+
+                        if (Value != null)
+                            return Value.ToString();
+                    }
                 }
             }
             return null;
@@ -626,15 +668,15 @@ namespace ModTranslator
                 return false;
             }
 
-            var item = TableGrid.Items[RowIndex];
+            var Row = TableGrid.Items[RowIndex];
 
-            var PropertyInfo = item.GetType().GetProperties()[ColumnIndex];
+            var PropertyInfo = Row.GetType().GetProperties()[ColumnIndex];
 
             try
             {
                 //var ConvertedValue = Convert.ChangeType(newValue, PropertyInfo.PropertyType);
 
-                PropertyInfo.SetValue(item, NewValue);
+                PropertyInfo.SetValue(Row, NewValue);
 
                 var Result = GetCellStringValue(TableGrid, RowIndex, ColumnIndex);
 
@@ -648,6 +690,7 @@ namespace ModTranslator
             return false;
         }
 
+        // Вернет любую
         public ModTextRow? GetRowDataByIndex(int Index)
         {
             if (MainDataGrid.Items.Count > Index && Index >= 0)
@@ -668,8 +711,6 @@ namespace ModTranslator
             {
                 Column.Visibility = Value;
 
-                //MainDataGrid.Items.Refresh();
-
                 return true;
             }
             return false;
@@ -681,11 +722,11 @@ namespace ModTranslator
             {
                 //SelectFilesBox.SelectedIndex = SelectedIndex;
 
-                string? SelectedElement = SelectFilesBox.Items[SelectedIndex].ToString();
+                string? SelectedCategory = SelectFilesBox.Items[SelectedIndex].ToString();
 
-                if (SelectedElement != null)
+                if (!string.IsNullOrEmpty(SelectedCategory) && Directory.Exists(g_ModFolderPath))
                 {
-                    string FilePath = g_ModFolderPath + "\\" + g_BindingsFileNames[SelectedElement].OriginalFile;
+                    string FilePath = g_ModFolderPath + "\\" + g_BindingsFileNames[SelectedCategory].OriginalFile;
 
                     if (ProcessAndLoadOriginalFiles(FilePath))
                     {
@@ -728,7 +769,7 @@ namespace ModTranslator
                     else
                         Result.FailedLoad.Add(Data); // В файле-переводе и оригинале нет совпадения ID. (Вероятно, импортируемый файл может быть старой версией перевода)
                 }
-                UpdateTableTextData(g_CurrentMainGridData);
+                RefreshMainGrid(g_CurrentMainGridData);
             }
             return Result;
         }
@@ -741,21 +782,49 @@ namespace ModTranslator
             {
                 if (Item is ModTextRow TextMod)
                 {
-                    if (!string.IsNullOrEmpty(TextMod.TranslatedText))
-                        TranslatedCount++;
+                    if (IsVisibleRow(TextMod))
+                    {
+                        if (!string.IsNullOrEmpty(TextMod.TranslatedText))
+                            TranslatedCount++;
+                    }
                 }
             }
             return TranslatedCount;
         }
 
-        private void SetTranslateCountLabel(long TranslateLines, long AllLines)
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="TableGrid"></param>
+        /// <returns></returns>
+        private static long GetVisibleCount(DataGrid TableGrid)
+        {
+            long VisibleCount = 0;
+
+            foreach (var Item in TableGrid.Items)
+            {
+                if (Item is ModTextRow TextMod)
+                {
+                    if (IsVisibleRow(TextMod))
+                        VisibleCount++;
+                }
+            }
+            return VisibleCount;
+        }
+
+        public long GetVisibleCount()
+        {
+            return GetVisibleCount(MainDataGrid);
+        }
+
+        public void SetTranslateCountLabel(long TranslateLines, long AllLines)
         {
             TranslateCount.Content = string.Format("Переведено: {0}\\{1}", TranslateLines, AllLines);
         }
 
-        private void SetTranslateCountLabel()
+        public void SetTranslateCountLabel()
         {
-            SetTranslateCountLabel(HowManyTranslatedLines(), g_CurrentMainGridData.Count);
+            SetTranslateCountLabel(HowManyTranslatedLines(), GetVisibleCount());
         }
 
         private string ReplaceForbiddenChars(string Input)
@@ -772,7 +841,7 @@ namespace ModTranslator
 
             using (StreamWriter WriteText = new StreamWriter(FilePath))
             {
-                foreach (ModTextRow TextData in g_CurrentMainGridData)
+                foreach (var TextData in g_CurrentMainGridData)
                 {
                     if (WriteDummy == false)
                     {
@@ -783,21 +852,24 @@ namespace ModTranslator
                         WriteDummy = true;
                     }
 
-                    string TranslatedData = TextData.TranslatedText;
-
-                    if (g_OptionsWindow.FreeExport.IsChecked == true)
+                    if (IsVisibleRow(TextData)) // Пишем только видимые строки.
                     {
-                        if (string.IsNullOrEmpty(TranslatedData))
-                            TranslatedData = TextData.OriginalText;
-                    }
+                        string TranslatedData = TextData.TranslatedText;
 
-                    if (!string.IsNullOrEmpty(TranslatedData)) // Не записываем в файл поля без перевода.
-                    {
-                        var ResultTranlatedText = ReplaceForbiddenChars(TranslatedData);
+                        if (g_OptionsWindow.FreeExport.IsChecked == true)
+                        {
+                            if (string.IsNullOrEmpty(TranslatedData))
+                                TranslatedData = TextData.OriginalText;
+                        }
 
-                        string NewLine = TextData.RowId + "|" + ResultTranlatedText;
+                        if (!string.IsNullOrEmpty(TranslatedData)) // Не записываем в файл поля без перевода. (Возможно стоит?)
+                        {
+                            var ResultTranlatedText = ReplaceForbiddenChars(TranslatedData);
 
-                        WriteText.WriteLine(NewLine.TrimEnd());
+                            string NewLine = TextData.RowId + "|" + ResultTranlatedText;
+
+                            WriteText.WriteLine(NewLine.TrimEnd()); // Нужно ли удалять пробелы в конце строки?
+                        }
                     }
                 }
             }
@@ -921,7 +993,7 @@ namespace ModTranslator
 
                         g_DataHasBeenChanged = true;
                     }
-                    SetTranslateCountLabel(TranslatedLines, g_CurrentMainGridData.Count);
+                    SetTranslateCountLabel(TranslatedLines, GetVisibleCount());
 
                     g_CurrentCellValue = string.Empty;
                 }
@@ -967,9 +1039,9 @@ namespace ModTranslator
             return Result;
         }
 
-        public ModTextRow? SearchModTextByValue(string Value, int StartRow = 0, bool FullSearch = true, bool VisibleColumn = true, StringComparison CaseType = StringComparison.Ordinal)
+        public ModTextRow? SearchModTextByValue(string Value, int StartRow = 0, bool FullSearch = true, bool OnlyVisible = true, StringComparison CaseType = StringComparison.Ordinal)
         {
-            var Indexes = FindCellByString(MainDataGrid, Value, StartRow, FullSearch, VisibleColumn, CaseType);
+            var Indexes = FindCellByString(MainDataGrid, Value, StartRow, FullSearch, OnlyVisible, CaseType);
 
             if (Indexes.ColumnIndex >= 0 && Indexes.RowIndex >= 0)
             {
@@ -982,14 +1054,20 @@ namespace ModTranslator
             return null;
         }
 
-        public static int FindCellByStrinInColumn(DataGrid TableGrid, string Value, int StartRow, int ColumnIndex, bool FullSearch = false, StringComparison Case = StringComparison.Ordinal)
+        public static int FindCellByStringInColumn(DataGrid DataTable, string Value, int StartRow, int ColumnIndex, bool FullSearch = false, bool OnlyVisible = true, StringComparison Case = StringComparison.Ordinal)
         {
-            if (ColumnIndex > TableGrid.Columns.Count || StartRow < 0 || ColumnIndex < 0)
+            if (ColumnIndex > DataTable.Columns.Count || StartRow < 0 || ColumnIndex < 0)
                 return -1;
 
-            for (int Row = StartRow; Row < TableGrid.Items.Count; Row++)
+            if (OnlyVisible)
             {
-                var CellValue = GetCellStringValue(TableGrid, Row, ColumnIndex);
+                if (DataTable.Columns[ColumnIndex].Visibility != Visibility.Visible)
+                    return -1;
+            }
+
+            for (int Row = StartRow; Row < DataTable.Items.Count; Row++)
+            {
+                var CellValue = GetCellStringValue(DataTable, Row, ColumnIndex, OnlyVisible);
 
                 if (CellValue != null)
                 {
@@ -1018,20 +1096,14 @@ namespace ModTranslator
         /// <param name="Value"></param>
         /// <param name="StartRow">Стартовый индекс строки от которой будет идти поиск</param>
         /// <param name="FullSearch">Поиск строки целиком, а не по первому вхождению.</param>
-        /// <param name="VisibleColumn">Поиск только в отображаемых столбцах</param>
+        /// <param name="OnlyVisible">Поиск только в отображаемых данных</param>
         /// <param name="Case"></param>
         /// <returns></returns>
-        public (int RowIndex, int ColumnIndex) FindCellByString(DataGrid DataTable, string Value, int StartRow, bool FullSearch = false, bool VisibleColumn = true, StringComparison Case = StringComparison.Ordinal)
+        public (int RowIndex, int ColumnIndex) FindCellByString(DataGrid DataTable, string Value, int StartRow, bool FullSearch = false, bool OnlyVisible = true, StringComparison Case = StringComparison.Ordinal)
         {
             for (int ColumnIndex = 0; ColumnIndex < DataTable.Columns.Count; ColumnIndex++)
             {
-                if (VisibleColumn) // Поиск только в видимых столбцах.
-                {
-                    if (DataTable.Columns[ColumnIndex].Visibility != Visibility.Visible)
-                        continue;
-                }
-
-                var RowIndex = FindCellByStrinInColumn(DataTable, Value, StartRow, ColumnIndex, FullSearch, Case);
+                var RowIndex = FindCellByStringInColumn(DataTable, Value, StartRow, ColumnIndex, FullSearch, OnlyVisible, Case);
 
                 if (RowIndex >= 0)
                     return (RowIndex, ColumnIndex);
@@ -1043,20 +1115,18 @@ namespace ModTranslator
         {
             g_CompareMode = false;
 
-            string? SelectedValue = SelectFilesBox.SelectedValue.ToString();
+            string? SelectedCategory = SelectFilesBox.SelectedValue.ToString();
 
-            if (!string.IsNullOrEmpty(SelectedValue))
+            if (!string.IsNullOrEmpty(SelectedCategory) && Directory.Exists(g_ModFolderPath))
             {
-                string FilePath = g_ModFolderPath + "\\" + g_BindingsFileNames[SelectedValue].OriginalFile;
+                string FilePath = g_ModFolderPath + "\\" + g_BindingsFileNames[SelectedCategory].OriginalFile;
 
-                if (!string.Equals(g_CurrentOriginalFile, FilePath))
+                if (File.Exists(g_CurrentOriginalFile) && !string.Equals(g_CurrentOriginalFile, FilePath))
                 {
                     DataTextChangedMessage();
 
                     if (ProcessAndLoadOriginalFiles(FilePath))
                     {
-                        FocusFirstRow();
-
                         EnableControlButtons();
 
                         SetTranslateCountLabel();
@@ -1081,18 +1151,16 @@ namespace ModTranslator
             {
                 SelectFilesBox.IsEnabled = true;
 
+                g_ModFolderPath = FolderDialog.FolderName;
+
                 if (LoadOriginalFilesToFileBox(FolderDialog.FolderName) > 0) // Fixme: Вызывает срабатывание SelectFilesBox_SelectionChanged
                 {
-                    g_ModFolderPath = FolderDialog.FolderName;
-
-                    if (LoadFileBoxItemByIndex(0))
+                    if (LoadFileBoxItemByIndex(0)) // Грузим 1 категорию.
                     {
                         ModPathText.Text = FolderDialog.FolderName;
 
                         EnableControlButtons();
                     }
-                    else
-                        MessageBox.Show("Ошибка загрузки.", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
                 else
                     MessageBox.Show("Неверный мод.", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
@@ -1252,7 +1320,7 @@ namespace ModTranslator
 
             FolderDialog.Multiselect = false;
 
-            if (!string.IsNullOrEmpty(g_ModFolderPath))
+            if (Directory.Exists(g_ModFolderPath))
                 FolderDialog.InitialDirectory = g_ModFolderPath;
 
             if (FolderDialog.ShowDialog() == true)
@@ -1284,9 +1352,9 @@ namespace ModTranslator
                     //return;
                 }
 
-                UnloadTableTextData();
+                UnloadMainGrid();
 
-                UpdateTableTextData(ModChanges);
+                RefreshMainGrid(ModChanges);
 
                 SetTranslateCountLabel();
 
@@ -1305,6 +1373,7 @@ namespace ModTranslator
             }
         }
 
+        // Fixme: фокус будет на любую первую, а не видимую.
         private void FocusFirstRow()
         {
             var Data = GetRowDataByIndex(0);
@@ -1327,23 +1396,26 @@ namespace ModTranslator
 
             if (Data.SelectionUnit == DataGridSelectionUnit.Cell)
             {
-                var Item = Data.Items[RowIndex];
+                var Item = Data.Items[RowIndex] as ModTextRow;
 
-                var Column = Data.Columns[ColumnIndex];
-
-                Data.ScrollIntoView(Item, Column); // Фокус на строку.
-
-                Data.CurrentCell = new DataGridCellInfo(Item, Column);
-
-                Data.SelectedCells.Clear();
-
-                Data.SelectedCells.Add(new DataGridCellInfo(Item, Column));
-
-                Data.Focus();
-
-                if (!Data.IsReadOnly)
+                if (Item != null) // Невидимые строки игнорим.
                 {
-                    //Data.BeginEdit();
+                    var Column = Data.Columns[ColumnIndex];
+
+                    Data.ScrollIntoView(Item, Column); // Фокус на строку.
+
+                    Data.CurrentCell = new DataGridCellInfo(Item, Column);
+
+                    Data.SelectedCells.Clear();
+
+                    Data.SelectedCells.Add(new DataGridCellInfo(Item, Column));
+
+                    Data.Focus();
+
+                    if (!Data.IsReadOnly)
+                    {
+                        //Data.BeginEdit();
+                    }
                 }
             }
         }
@@ -1381,11 +1453,14 @@ namespace ModTranslator
                 if (ModText == null)
                     return -1;
 
-                if (ModText.TranslatedText == string.Empty)
+                if (IsVisibleRow(ModText)) // Только видимые строки
                 {
-                    FocusCell(TableGrid, NextIndex, ColumnIndex);
+                    if (ModText.TranslatedText == string.Empty)
+                    {
+                        FocusCell(TableGrid, NextIndex, ColumnIndex);
 
-                    return 1;
+                        return 1;
+                    }
                 }
                 NextIndex++;
             }
@@ -1422,11 +1497,14 @@ namespace ModTranslator
                 if (ModText == null)
                     return -1;
 
-                if (ModText.TranslatedText == string.Empty)
+                if (IsVisibleRow(ModText))
                 {
-                    FocusCell(TableGrid, PrevIndex, ColumnIndex);
+                    if (ModText.TranslatedText == string.Empty)
+                    {
+                        FocusCell(TableGrid, PrevIndex, ColumnIndex);
 
-                    return 1;
+                        return 1;
+                    }
                 }
                 PrevIndex--;
             }
@@ -1455,7 +1533,7 @@ namespace ModTranslator
 
             g_OptionsWindow.Show();
 
-            g_OptionsWindow.Owner = this; // Создаём дочернее окно, а не отдельное.
+            g_OptionsWindow.Owner = this;
         }
 
         private void SearchMenu_Click(object sender, RoutedEventArgs e)
@@ -1507,13 +1585,13 @@ namespace ModTranslator
 
                         g_CurrentMainGridData.Reverse(); // Вместо коллекций и прочего сортируем данные в лоб.
 
-                        UpdateTableTextData(g_CurrentMainGridData);
+                        RefreshMainGrid(g_CurrentMainGridData);
                     }
                 }
             }
         }
 
-        public static List<string> GetAllColumnText(DataGrid TableData, DataGridColumn Column)
+        private static List<string> GetAllColumnText(DataGrid TableData, DataGridColumn Column, bool OnlyVisible = true)
         {
             var Result = new List<string>();
 
@@ -1527,12 +1605,12 @@ namespace ModTranslator
 
             for (int RowIndex = 0; RowIndex < TableData.Items.Count; RowIndex++)
             {
-                var CellValue = GetCellStringValue(TableData, RowIndex, ColumnIndex);
+                var CellValue = GetCellStringValue(TableData, RowIndex, ColumnIndex, OnlyVisible);
 
-                if (CellValue == null)
-                    CellValue = string.Empty;
-
-                Result.Add(CellValue);
+                if (CellValue != null)
+                {
+                    Result.Add(CellValue);
+                }
             }
             return Result;
         }
@@ -1553,11 +1631,11 @@ namespace ModTranslator
             {
                 if (FileDialog.FileName != null)
                 {
-                    var Result = GetAllColumnText(TableGrid, Column);
+                    var Result = GetAllColumnText(TableGrid, Column, true);
 
                     File.WriteAllLines(FileDialog.FileName, Result, Encoding.UTF8);
 
-                    if (Result.Count == TableGrid.Items.Count)
+                    if (Result.Count == GetVisibleCount())
                         return true;
                 }
             }
@@ -1582,7 +1660,7 @@ namespace ModTranslator
                 {
                     var AllLines = File.ReadAllLines(FileDialog.FileName, Encoding.UTF8);
 
-                    if (AllLines.Length > TableGrid.Items.Count)
+                    if (AllLines.Length > GetVisibleCount()) // Загружаемых данных не должно быть больше, чем видно в таблице
                     {
                         MessageBox.Show($"Файл {FileDialog.FileName} содержит больше полей, чем есть в таблице.", "Ошибка загрузки", MessageBoxButton.OK, MessageBoxImage.Error);
 
@@ -1597,12 +1675,17 @@ namespace ModTranslator
                         {
                             for (int i = 0; i < AllLines.Length; i++)
                             {
-                                SetCellValue(TableGrid, i, ColumnIndex, AllLines[i]);
+                                var RowData = GetRowDataByIndex(i);
 
-                                TableGrid.Items.Refresh(); // Обновляем табличку.
-
-                                SetTranslateCountLabel();
+                                if (RowData != null && IsVisibleRow(RowData))
+                                {
+                                    SetCellValue(TableGrid, i, ColumnIndex, AllLines[i]);
+                                }
                             }
+                            TableGrid.Items.Refresh(); // Обновляем табличку.
+
+                            SetTranslateCountLabel();
+
                             return true;
                         }
                     }
@@ -1670,11 +1753,13 @@ namespace ModTranslator
             {
                 var CurrentColumn = TableGrid.CurrentColumn;
 
-                if (CurrentColumn.Header.ToString() == "№")
+                var ColumnName = CurrentColumn.Header.ToString();
+
+                if (ColumnName == "№")
                     e.Handled = true;
             }
         }
-
+        
         private void MainDataGrid_Sorting(object sender, DataGridSortingEventArgs e)
         {
             e.Handled = true; // Не трогать
@@ -1682,7 +1767,22 @@ namespace ModTranslator
 
         private void MainDataGrid_LoadingRow(object sender, DataGridRowEventArgs e)
         {
-          //
+            var RowData = e.Row;
+
+            var ModText = RowData.Item as ModTextRow;
+
+            if (ModText != null)
+            {
+                if (!IsVisibleRow(ModText)) // Если строка помечена.
+                {
+                    RowData.Visibility = Visibility.Collapsed;  // скрываем ее
+                }
+                else
+                {
+                    RowData.Visibility = Visibility.Visible;
+                }
+            }
         }
+
     }
 }

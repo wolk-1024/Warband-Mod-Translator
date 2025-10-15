@@ -57,7 +57,7 @@ namespace ModTranslatorSettings
 
         private void ShowID_Checked(object sender, RoutedEventArgs e)
         {
-            if (ShowID.IsChecked == true && g_MainWindow != null)
+            if (g_MainWindow != null)
             {
                 g_MainWindow.SetColumnVisibility("ID", Visibility.Visible);
             }
@@ -65,7 +65,7 @@ namespace ModTranslatorSettings
 
         private void ShowID_Unchecked(object sender, RoutedEventArgs e)
         {
-            if (ShowID.IsChecked == false && g_MainWindow != null)
+            if (g_MainWindow != null)
             {
                 g_MainWindow.SetColumnVisibility("ID", Visibility.Collapsed);
             }
@@ -73,33 +73,54 @@ namespace ModTranslatorSettings
 
         private void ShowDubsID_Checked(object sender, RoutedEventArgs e)
         {
-            if (ShowDubsID.IsChecked == true && g_MainWindow != null)
+            if (g_MainWindow != null)
             {
                 Parser.g_DeleteDublicatesIDs = false;
 
                 if (g_MainWindow.IsLoadedTextData())
                 {
-                    g_MainWindow.DataTextChangedMessage();
-
-                    g_MainWindow.ProcessAndLoadOriginalFiles(g_MainWindow.g_CurrentOriginalFile);
+                    g_MainWindow.RefreshMainGridAndSetCount();
                 }
             }
         }
 
         private void ShowDubsID_Unchecked(object sender, RoutedEventArgs e)
         {
-            if (ShowID.IsChecked == true && g_MainWindow != null)
+            if (g_MainWindow != null)
             {
                 Parser.g_DeleteDublicatesIDs = true;
 
                 if (g_MainWindow.IsLoadedTextData())
                 {
-                    g_MainWindow.DataTextChangedMessage();
-
-                    g_MainWindow.ProcessAndLoadOriginalFiles(g_MainWindow.g_CurrentOriginalFile);
+                    g_MainWindow.RefreshMainGridAndSetCount();
                 }
             }
         }
 
+        private void ShowBlocksymbols_Checked(object sender, RoutedEventArgs e)
+        {
+            if (g_MainWindow != null)
+            {
+                Parser.g_IgnoreBlockingSymbol = true;
+
+                if (g_MainWindow.IsLoadedTextData())
+                {
+                    g_MainWindow.RefreshMainGridAndSetCount();
+                }
+            }
+        }
+
+        private void ShowBlocksymbols_Unchecked(object sender, RoutedEventArgs e)
+        {
+            if (g_MainWindow != null)
+            {
+                Parser.g_IgnoreBlockingSymbol = false;
+
+                if (g_MainWindow.IsLoadedTextData())
+                {
+                    g_MainWindow.RefreshMainGridAndSetCount();
+                }
+            }
+        }
     }
 }
