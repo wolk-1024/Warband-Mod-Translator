@@ -16,6 +16,7 @@ using Microsoft.Win32;
 using ModTranslatorSettings;
 using System.ComponentModel;
 using System.Data;
+using System.Data.Common;
 using System.IO;
 using System.Reflection;
 using System.Text;
@@ -270,13 +271,13 @@ namespace ModTranslator
 
             foreach (var Row in TextMod)
             {
-                Row.RowNum = string.Empty;
+                Row.RowNum = 0;
 
                 if (IsVisibleRow(Row))
                 {
                     VisibleCount++;
 
-                    Row.RowNum = VisibleCount.ToString();
+                    Row.RowNum = VisibleCount;
                 }
             }
         }
@@ -1554,6 +1555,7 @@ namespace ModTranslator
             Window.Owner = this;
         }
 
+        /*
         private void DataGridColumnHeader_Click(object sender, RoutedEventArgs e)
         {
             DataGridColumnHeader? Header = sender as DataGridColumnHeader;
@@ -1566,11 +1568,7 @@ namespace ModTranslator
                 {
                     if (Column != null && Column.CanUserSort)
                     {
-                        int RowNum = 0;
-
-                        int.TryParse(g_CurrentMainGridData[0].RowNum, out RowNum);
-
-                        if (Column.SortDirection == null && RowNum == 1)
+                        if (Column.SortDirection == null)
                         {
                             Column.SortDirection = ListSortDirection.Descending;
                         }
@@ -1590,6 +1588,7 @@ namespace ModTranslator
                 }
             }
         }
+        */
 
         private static List<string> GetAllColumnText(DataGrid TableData, DataGridColumn Column, bool OnlyVisible = true)
         {
@@ -1762,7 +1761,12 @@ namespace ModTranslator
         
         private void MainDataGrid_Sorting(object sender, DataGridSortingEventArgs e)
         {
-            e.Handled = true; // Не трогать
+            var Column = e.Column;
+
+            if (Column.SortDirection == null)
+            {
+                Column.SortDirection = ListSortDirection.Ascending;
+            }
         }
 
         private void MainDataGrid_LoadingRow(object sender, DataGridRowEventArgs e)

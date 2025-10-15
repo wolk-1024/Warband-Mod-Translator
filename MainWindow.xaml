@@ -46,12 +46,6 @@
                 </ContextMenu>
             </DataGrid.ContextMenu>
 
-            <DataGrid.ColumnHeaderStyle>
-                <Style TargetType="{x:Type DataGridColumnHeader}">
-                    <EventSetter Event="Click" Handler="DataGridColumnHeader_Click"/>
-                </Style>
-            </DataGrid.ColumnHeaderStyle>
-
             <DataGrid.Columns>
 
                 <DataGridTextColumn Header="№" Binding="{Binding RowNum}" Width="40" MaxWidth ="60"  CanUserSort="true" CanUserReorder="False" IsReadOnly="false" Visibility="Visible">

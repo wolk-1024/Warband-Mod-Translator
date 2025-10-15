@@ -72,7 +72,7 @@ namespace WarbandParser
 
         public class ModTextRow
         {
-            public string RowNum { get; set; } = string.Empty;
+            public int RowNum { get; set; } = 0;
 
             public string RowId { get; set; } = string.Empty;
 
