@@ -953,12 +953,14 @@ namespace WarbandParser
                             Flags = NewFlags
                         });
 
+                    var PluralFlags = IsBlockedLine(TroopsNamePlural) ? RowFlags.BlockSymbol : RowFlags.None;
+
                     ModTextResult.Add(
                         new ModTextRow
                         {
                             RowId = NewID,
                             OriginalText = TroopsNamePlural,
-                            Flags = NewFlags
+                            Flags = PluralFlags
                         });
                 }
                 return MarkDuplicateIDs(ModTextResult);
