@@ -252,6 +252,8 @@ namespace ModTranslator
             MainDataGrid.ItemsSource = TextData;
 
             MainDataGrid.Items.Refresh();
+
+            FocusFirstVisibleRow();
         }
 
         public void RefreshMainGridAndSetCount()
@@ -1374,16 +1376,21 @@ namespace ModTranslator
             }
         }
 
-        // Fixme: фокус будет на любую первую, а не видимую.
-        private void FocusFirstRow()
+        /// <summary>
+        /// Прокрутит табличку к первой видимой строке.
+        /// </summary>
+        private void FocusFirstVisibleRow()
         {
-            var Data = GetRowDataByIndex(0);
-
-            if (Data != null)
+            for (int i = 0; i < MainDataGrid.Items.Count; i++)
             {
-                //MainDataGrid.SelectedIndex = 0;
+                var Row = MainDataGrid.Items[i] as ModTextRow;
 
-                FocusOnRow(Data);
+                if (Row != null && IsVisibleRow(Row))
+                {
+                    FocusOnRow(Row);
+
+                    return;
+                }
             }
         }
 
@@ -1399,11 +1406,11 @@ namespace ModTranslator
             {
                 var Item = Data.Items[RowIndex] as ModTextRow;
 
-                if (Item != null) // Невидимые строки игнорим.
+                if (Item != null)
                 {
                     var Column = Data.Columns[ColumnIndex];
 
-                    Data.ScrollIntoView(Item, Column); // Фокус на строку.
+                    Data.ScrollIntoView(Item, Column); // Прокручиваем к строке.
 
                     Data.CurrentCell = new DataGridCellInfo(Item, Column);
 
