@@ -16,13 +16,11 @@ using Microsoft.Win32;
 using ModTranslatorSettings;
 using System.ComponentModel;
 using System.Data;
-using System.Data.Common;
 using System.IO;
 using System.Reflection;
 using System.Text;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Input;
 
@@ -222,8 +220,6 @@ namespace ModTranslator
             if (IsLoadedTextData())
             {
                 g_CurrentSelectedCell = (-1, -1);
-
-                g_FileForExport = string.Empty;
 
                 g_CurrentCellValue = string.Empty;
 
@@ -894,13 +890,18 @@ namespace ModTranslator
             return string.Empty;
         }
 
-        private void ExportFileDialog()
+        private void ExportFileDialog(string SaveTo = "")
         {
             var FileDialog = new SaveFileDialog();
 
-            FileDialog.Filter = "Файл перевода|*.csv";
+            FileDialog.Title = "Экспорт перевода";
 
-            var CsvName = GetTranslateFileNameFromFileBox();
+            FileDialog.Filter = "CSV файлы|*.csv|Текстовые файлы|*.txt";
+
+            var CsvName = SaveTo;
+
+            if (string.IsNullOrEmpty(CsvName))
+                CsvName = Path.GetFileName(g_FileForExport);
 
             if (g_CompareMode)
                 FileDialog.FileName = "new_" + CsvName;
@@ -1116,6 +1117,8 @@ namespace ModTranslator
 
         private void SelectFilesBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
+            DataTextChangedMessage();
+
             g_CompareMode = false;
 
             string? SelectedCategory = SelectFilesBox.SelectedValue.ToString();
@@ -1124,10 +1127,10 @@ namespace ModTranslator
             {
                 string FilePath = g_ModFolderPath + "\\" + g_BindingsFileNames[SelectedCategory].OriginalFile;
 
+                g_FileForExport = g_ModFolderPath + "\\languages\\"+ g_BindingsFileNames[SelectedCategory].CsvFile;
+
                 if (File.Exists(g_CurrentOriginalFile) && !string.Equals(g_CurrentOriginalFile, FilePath))
                 {
-                    DataTextChangedMessage();
-
                     if (ProcessAndLoadOriginalFiles(FilePath))
                     {
                         EnableControlButtons();
@@ -1153,6 +1156,8 @@ namespace ModTranslator
             if (FolderDialog.ShowDialog() == true)
             {
                 SelectFilesBox.IsEnabled = true;
+
+                g_FileForExport = string.Empty;
 
                 g_ModFolderPath = FolderDialog.FolderName;
 
@@ -1185,7 +1190,9 @@ namespace ModTranslator
 
             var DialogFile = new OpenFileDialog();
 
-            DialogFile.Filter = "Файл перевода|*.csv";
+            DialogFile.Title = "Импорт перевода";
+
+            DialogFile.Filter = "CSV файлы|*.csv|Текстовые файлы|*.txt|Все файлы|*.*";
 
             DialogFile.FileName = GetTranslateFileNameFromFileBox();
 
@@ -1252,19 +1259,9 @@ namespace ModTranslator
             {
                 g_DataHasBeenChanged = false;
 
-                if (string.IsNullOrEmpty(g_FileForExport) && IsLoadedTextData())
+                if (IsLoadedTextData())
                 {
                     ExportFileDialog();
-                }
-                else if (IsLoadedTextData())
-                {
-                    this.Cursor = Cursors.Wait;
-
-                    Thread.Sleep(150);
-
-                    this.Cursor = null;
-
-                    ExportModTextToFile(g_FileForExport);
                 }
                 e.Handled = true;
             }
@@ -1351,8 +1348,6 @@ namespace ModTranslator
                 if (ModChanges.Count == 0)
                 {
                     MessageBox.Show($"Разницы нет", "Сравнение", MessageBoxButton.OK, MessageBoxImage.Information);
-
-                    //return;
                 }
 
                 UnloadMainGrid();
@@ -1361,6 +1356,10 @@ namespace ModTranslator
 
                 SetTranslateCountLabel();
 
+                if (ModChanges.Count > 0)
+                {
+                    MessageBox.Show($"Изменено {ModChanges.Count} строк", "Сравнение", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
                 return true;
             }
             return false;
