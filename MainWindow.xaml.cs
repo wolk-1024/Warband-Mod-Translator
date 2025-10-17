@@ -309,35 +309,46 @@ namespace ModTranslator
         {
             var Result = new List<string>();
 
-            bool inQuotes = false;
+            if (string.IsNullOrEmpty(TextLine))
+                return Result;
 
-            var CurrentField = "";
+            bool InQuotes = false;
+
+            var СurrentField = new StringBuilder();
+
+            bool SeparatorFound = false;
 
             for (int i = 0; i < TextLine.Length; i++)
             {
-                char Char = TextLine[i];
+                char currentChar = TextLine[i];
 
-                if (Char == '"')
+                if (currentChar == '"')
                 {
-                    if (i + 1 < TextLine.Length && TextLine[i + 1] == '"')
+                    if (InQuotes && i + 1 < TextLine.Length && TextLine[i + 1] == '"')
                     {
-                        CurrentField += '"';
+                        СurrentField.Append('"');
 
-                        i++;
+                        i++; 
                     }
                     else
-                        inQuotes = !inQuotes;
+                    {
+                        InQuotes = !InQuotes;
+                    }
                 }
-                else if (Char == Separator && !inQuotes)
+                else if (currentChar == Separator && !InQuotes && !SeparatorFound)
                 {
-                    Result.Add(CurrentField);
+                    Result.Add(СurrentField.ToString());
 
-                    CurrentField = "";
+                    СurrentField.Clear();
+
+                    SeparatorFound = true;
                 }
                 else
-                    CurrentField += Char;
+                {
+                    СurrentField.Append(currentChar);
+                }
             }
-            Result.Add(CurrentField);
+            Result.Add(СurrentField.ToString());
 
             return Result;
         }
@@ -740,7 +751,13 @@ namespace ModTranslator
             return false;
         }
 
-        private TextImportInfo ImportTranslate(string FilePath)
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="FilePath"></param>
+        /// <param name="LoadInEmpty"></param>
+        /// <returns></returns>
+        private TextImportInfo ImportTranslate(string FilePath, bool LoadInEmpty = false)
         {
             var Result = new TextImportInfo { SuccessLoaded = 0 };
 
@@ -761,9 +778,21 @@ namespace ModTranslator
 
                     if (DataIndex >= 0)
                     {
-                        g_CurrentMainGridData[DataIndex].TranslatedText = Data.TranslatedText;
+                        if (LoadInEmpty) // Загрузка только в пустые
+                        {
+                            if (string.IsNullOrEmpty(g_CurrentMainGridData[DataIndex].TranslatedText))
+                            {
+                                g_CurrentMainGridData[DataIndex].TranslatedText = Data.TranslatedText;
 
-                        Result.SuccessLoaded++;
+                                Result.SuccessLoaded++;
+                            }
+                        }
+                        else
+                        {
+                            g_CurrentMainGridData[DataIndex].TranslatedText = Data.TranslatedText;
+
+                            Result.SuccessLoaded++;
+                        }
                     }
                     else
                         Result.FailedLoad.Add(Data); // В файле-переводе и оригинале нет совпадения ID. (Вероятно, импортируемый файл может быть старой версией перевода)
@@ -1188,6 +1217,9 @@ namespace ModTranslator
             if (!IsLoadedTextData())
                 return;
 
+            if (g_OptionsWindow == null)
+                return;
+
             var DialogFile = new OpenFileDialog();
 
             DialogFile.Title = "Импорт перевода";
@@ -1205,7 +1237,7 @@ namespace ModTranslator
 
             if (DialogFile.ShowDialog() == true)
             {
-                var Result = ImportTranslate(DialogFile.FileName);
+                var Result = ImportTranslate(DialogFile.FileName, (g_OptionsWindow.ImportOnlyInEmpty.IsChecked == true));
 
                 if (Result.FailedLoad.Count > 0 && g_OptionsWindow.ImportLog.IsChecked == true)
                 {

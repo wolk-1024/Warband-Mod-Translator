@@ -15,9 +15,11 @@
 
         <CheckBox x:Name="ImportLog" Content="Запись неудачного импорта" ToolTip="Запись в файл несоответствий строк импорта и загруженного оригинала." HorizontalAlignment="Left" Margin="15,75,0,0" VerticalAlignment="Top" Width="185" IsChecked="True"/>
 
-        <CheckBox x:Name="ShowDubsID" Content="Отображать дубликаты ID" Margin="15,100,0,0" VerticalAlignment="Top" HorizontalAlignment="Left" Width="200" IsChecked="False" Checked="ShowDubsID_Checked" Unchecked ="ShowDubsID_Unchecked"/>
+        <CheckBox x:Name="ShowDubsID" Content="Отображать дубликаты ID" ToolTip="Отобразить в таблице дублированные ID. (Не влияет на экспорт)" Margin="15,150,0,0" VerticalAlignment="Top" HorizontalAlignment="Left" Width="200" IsChecked="False" Checked="ShowDubsID_Checked" Unchecked ="ShowDubsID_Unchecked"/>
 
-        <CheckBox x:Name="ShowBlocksymbols" Content="Отображать строки с {!} символом" ToolTip="Строки, которые не будут отображены в игре помечаются символом {!}"  HorizontalAlignment="Left" Margin="15,125,0,0" VerticalAlignment="Top" Width="240" Checked="ShowBlocksymbols_Checked" Unchecked="ShowBlocksymbols_Unchecked"/>
+        <CheckBox x:Name="ShowBlocksymbols" Content="Отображать строки с {!} символом" ToolTip="Отобразить в таблице строки, помеченные игрой блокирующим символом {!} (Не влияет на экспорт)"  HorizontalAlignment="Left" Margin="15,125,0,0" VerticalAlignment="Top" Width="240" Checked="ShowBlocksymbols_Checked" Unchecked="ShowBlocksymbols_Unchecked"/>
+
+        <CheckBox x:Name="ImportOnlyInEmpty" Content="Импортировать только в пустые строки" ToolTip="Импортировать только непереведённые строки. По умолчанию импортируемый файл заменяет собой переведенные ранее строки."  HorizontalAlignment="Left" Margin="15,100,0,0" VerticalAlignment="Top" Width="251"/>
 
     </Grid>
 </Window>
