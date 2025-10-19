@@ -15,7 +15,6 @@ using System.Text;
 using System.Text.RegularExpressions;
 
 using EncodingTextFile;
-using static ModTranslator.MainTranslatorWindow;
 
 namespace WarbandParser
 {
@@ -67,7 +66,7 @@ namespace WarbandParser
             None = 0,
             Dublicate = 1,
             BlockSymbol = 2,
-            DublicateAndBlockSymbol = Dublicate | BlockSymbol
+            DublicateDifferentValue = 4 // Дубликат по id, но с разными значениями.
         }
 
         public class ModTextRow
@@ -1046,15 +1045,9 @@ namespace WarbandParser
                 if (FoundedArgs >= MaxArgs)
                     break;
 
-                if (IsLineStartsWithPrefix(Line, Prefix)) // Если id первый параметр
+                if (!FoundedPrefix)
                 {
-                    if (FoundedPrefix) // Если ещё один префикс, то ошибка.
-                    {
-                        Result.Clear();
-
-                        break;
-                    }
-                    else
+                    if (IsLineStartsWithPrefix(Line, Prefix))  // Если id первый параметр
                     {
                         Result.Add(Line);
 
@@ -1062,6 +1055,8 @@ namespace WarbandParser
 
                         FoundedPrefix = true;
                     }
+                    else
+                        return Result; // Без id не бывает строк.
                 }
                 else if (RegSymbolsAndNumbers.IsMatch(Line)) // Если одни знаки и цифры.
                 {
@@ -1111,6 +1106,7 @@ namespace WarbandParser
             return Result;
         }
 
+        /*
         static List<ModTextRow> MarkDuplicateIDs(List<ModTextRow> ModText)
         {
             var DuplicateGroups = ModText.GroupBy(x => x.RowId).Where(g => g.Count() > 1).ToList();
@@ -1131,6 +1127,49 @@ namespace WarbandParser
                 }
             }
             return ModText;
+        }
+        */
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="ModText"></param>
+        /// <returns></returns>
+        public static List<ModTextRow> MarkDuplicateIDs(List<ModTextRow> ModText)
+        {
+            var Result = new List<ModTextRow>(ModText);
+
+            var GroupIDs = Result.GroupBy(Row => Row.RowId);
+
+            foreach (var Group in GroupIDs)
+            {
+                var GroupList = Group.ToList();
+
+                if (GroupList.Count > 1)
+                {
+                    var FirstItem = GroupList[0];
+
+                    for (int i = 1; i < GroupList.Count; i++)
+                    {
+                        var Dublicate = GroupList[i];
+
+                        RowFlags NewFlags = Dublicate.Flags | RowFlags.Dublicate;
+
+                        if (!string.Equals(Dublicate.OriginalText, FirstItem.OriginalText))
+                        {
+                            NewFlags |= RowFlags.DublicateDifferentValue;
+                        }
+
+                        int ResultIndex = Result.IndexOf(Dublicate);
+
+                        if (ResultIndex >= 0)
+                        {
+                            Result[ResultIndex].Flags = NewFlags;
+                        }
+                    }
+                }
+            }
+            return Result;
         }
 
         /// <summary>
@@ -1157,7 +1196,6 @@ namespace WarbandParser
                     if (!g_IgnoreBlockingSymbol) // и мы НЕ игнорим их, то
                         return false; // строка не видна.
                 }
-                // А если и дубликат и блок?
             }
             return true;
         }

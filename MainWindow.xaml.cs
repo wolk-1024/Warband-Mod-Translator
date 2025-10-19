@@ -436,7 +436,7 @@ namespace ModTranslator
 
                 var LineArgs = ParseCsvLine(CurrentLine, (char)CsvSeparator);
 
-                if (LineArgs.Count <= 1 || LineArgs.Count > MaxArgs) // Параметров не должно быть больше MaxArgs, если больше, то явная ошибка.
+                if (LineArgs.Count <= 1 || LineArgs.Count > MaxArgs) // Параметров не должно быть больше MaxArgs, если больше, то явная ошибка в ParseCsvLine
                 {
                     //Result.Clear();
 
