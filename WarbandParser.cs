@@ -569,6 +569,63 @@ namespace WarbandParser
             return null;
         }
 
+        private static List<ModTextRow>? ParseMenuBlock(ParseArg MenuBlock)
+        {
+            var PartsOfMenu = ParseTextData(MenuBlock, "mno_");
+
+            if (PartsOfMenu.Count > 0)
+            {
+                var MnoList = new List<ModTextRow>();
+
+                foreach (var PartMenuLine in PartsOfMenu)
+                {
+                    var PartMenuArgs = GetModTextArgs(PartMenuLine, "mno_", 2);
+
+                    if (PartMenuArgs.Count > 0)
+                    {
+                        var PartID = PartMenuArgs[0];
+
+                        if (!IsLineStartsWithPrefix(PartID))
+                            return null;
+
+                        // Т.к блоки с меню читаем, то адреса будут ОТНОСИТЕЛЬНО начала блока menu_.
+                        var MnoLinePos = ((PartMenuLine.Start + MenuBlock.Start), (PartMenuLine.End + MenuBlock.Start));
+
+                        var PartFlags = RowFlags.None;
+
+                        if (PartMenuArgs.Count < 2) //
+                        {
+                            MnoList.Add(
+                                new ModTextRow
+                                {
+                                    RowId = PartID,
+                                    Flags = RowFlags.ParseError,
+                                    DataPos = MnoLinePos
+                                });
+
+                            continue;
+                        }
+
+                        var PartText = PartMenuArgs[1].Replace('_', ' ');
+
+                        if (IsBlockedLine(PartText))
+                            PartFlags |= RowFlags.BlockSymbol;
+
+                        MnoList.Add(
+                            new ModTextRow
+                            {
+                                RowId = PartID,
+                                OriginalText = PartText,
+                                Flags = PartFlags,
+                                DataPos = MnoLinePos
+                            });
+                    }
+                }
+                return MnoList;
+            }
+            return null;
+        }
+
         /// <summary>
         /// Есть проблемы: в menus.txt бывают подменю mno_ дубликаты, но с разными значениями.
         /// </summary>
@@ -579,15 +636,15 @@ namespace WarbandParser
             if (string.IsNullOrEmpty(FilePath))
                 return null;
 
-            var ModText = LoadAndParseFile(FilePath, "menu_");
+            var AllMenuBlocks = LoadAndParseFile(FilePath, "menu_");
 
-            if (ModText.Count > 0)
+            if (AllMenuBlocks.Count > 0)
             {
                 var ModTextResult = new List<ModTextRow>();
 
-                foreach (var FullMenuLine in ModText)
+                foreach (var MenuBlock in AllMenuBlocks)
                 {
-                    var MenuArgs = GetModTextArgs(FullMenuLine, "menu_", 2);
+                    var MenuArgs = GetModTextArgs(MenuBlock, "menu_", 2);
 
                     if (MenuArgs.Count < 2)
                         continue;
@@ -603,53 +660,19 @@ namespace WarbandParser
 
                     // Fixme: В DataPos будет позиция блока меню + подменю, а не только меню. (нужно переписать GetModTextArgs, чтобы можно передавать несколько префиксов)
 
-                    var MenuBlock = (FullMenuLine.Start, FullMenuLine.End);
-
                     ModTextResult.Add(
                         new ModTextRow
                         {
                             RowId = MenuID,
                             OriginalText = MenuText,
                             Flags = NewFlags,
-                            DataPos = MenuBlock
+                            DataPos = (MenuBlock.Start, MenuBlock.End)
                         });
 
-                    var PartsOfMenu = ParseTextData(FullMenuLine, "mno_");
+                    var Submenus = ParseMenuBlock(MenuBlock);
 
-                    if (PartsOfMenu.Count > 0)
-                    {
-                        var MnoList = new List<ModTextRow>();
-
-                        foreach (var PartMenuLine in PartsOfMenu)
-                        {
-                            var PartMenuArgs = GetModTextArgs(PartMenuLine, "mno_", 2);
-
-                            if (PartMenuArgs.Count < 2) //
-                                continue;
-
-                            var PartID = PartMenuArgs[0];
-
-                            if (!IsLineStartsWithPrefix(PartID))
-                                 return null;
-
-                            var PartText = PartMenuArgs[1].Replace('_', ' ');
-
-                            var PartFlags = IsBlockedLine(PartText) ? RowFlags.BlockSymbol : RowFlags.None;
-
-                            // Т.к блоки с меню читаем, то адреса будут ОТНОСИТЕЛЬНО начала блока menu_.
-                            var MnoLinePos = ((PartMenuLine.Start + FullMenuLine.Start), (PartMenuLine.End + FullMenuLine.Start));
-
-                            MnoList.Add(
-                                new ModTextRow
-                                {
-                                    RowId = PartID,
-                                    OriginalText = PartText,
-                                    Flags = PartFlags,
-                                    DataPos = MnoLinePos
-                                });
-                        }
-                        ModTextResult.AddRange(MnoList);
-                    }
+                    if (Submenus != null)
+                        ModTextResult.AddRange(Submenus);
                 }
                 return MarkDuplicateIDs(ModTextResult);
             }

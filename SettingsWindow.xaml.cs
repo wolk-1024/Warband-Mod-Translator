@@ -9,16 +9,10 @@ namespace ModTranslatorSettings
 {
     public partial class SettingsWindow : Window
     {
-
         /// <summary>
         /// Суффикс для дубликатов id
         /// </summary>
-        private const string c_DublicateSuffix = ".wt";
-
-        /// <summary>
-        /// Расширение резервных файлов.
-        /// </summary>
-        private const string c_BackupFileExt = ".bak";
+        private const string c_DublicateSuffix = ".";
 
         /// <summary>
         /// Главное окно.
