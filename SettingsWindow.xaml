@@ -21,5 +21,7 @@
 
         <CheckBox x:Name="ImportOnlyInEmpty" Content="Импортировать только в пустые строки" ToolTip="Импортировать только непереведённые строки. По умолчанию импортируемый файл заменяет собой переведенные ранее строки."  HorizontalAlignment="Left" Margin="15,100,0,0" VerticalAlignment="Top" Width="251"/>
 
+        <Button x:Name="FixMenus" Content="Испр. menus.txt" ToolTip="Использовать с острожностью. Перезаписывает все дубликаты id в оригинальном файле menus.txt" HorizontalAlignment="Left" Margin="15,220,0,0" Click="FixMenus_Click" Height="25" Width="95" VerticalAlignment="Top" IsEnabled="False"/>
+
     </Grid>
 </Window>

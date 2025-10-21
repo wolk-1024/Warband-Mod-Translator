@@ -3,6 +3,7 @@
  */
 using System.IO;
 using System.Text;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace EncodingTextFile
 {
@@ -198,6 +199,29 @@ namespace EncodingTextFile
                 return string.Empty;
             }
             return string.Empty;
+        }
+
+        public static string[] ReadAllLinesAndConvertTo(string FilePath, Encoding ConvertTo)
+        {
+            if (File.Exists(FilePath))
+            {
+                var Text = ReadTextFileAndConvertTo(FilePath, ConvertTo);
+
+                try
+                {
+                    if (!string.IsNullOrEmpty(Text))
+                    {
+                        var Result = Text.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+
+                        return Result;
+                    }
+                }
+                catch
+                {
+                    return Array.Empty<string>();
+                }
+            }
+            return Array.Empty<string>();
         }
 
         public static Encoding? GetTextFileEncoding(string FilePath)

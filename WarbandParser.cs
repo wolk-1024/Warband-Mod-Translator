@@ -1,5 +1,5 @@
 ﻿/*
- *  Парсер v08.10.2025
+ *  Парсер v21.10.2025
  *  
  *  Известные проблемы: 
  *  
@@ -13,11 +13,32 @@
 using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
-
+//
 using EncodingTextFile;
 
 namespace WarbandParser
 {
+    /// <summary>
+    /// Класс для биндинга с таблицей
+    /// </summary>
+    public class ModTextRow : ModRowInfo
+    {
+        public int RowNum { get; set; } = 0;
+
+        public string RowId { get; set; } = string.Empty;
+
+        public string OriginalText { get; set; } = string.Empty;
+
+        public string TranslatedText { get; set; } = string.Empty;
+    }
+
+    public class ModRowInfo
+    {
+        public Parser.RowFlags Flags { get; set; } = Parser.RowFlags.None;
+
+        public (int Start, int End) DataPos { get; set; } = (-1, -1); // Позиция данных в оригинальном файле. Используется пока только для menus.txt
+    }
+
     public static class Parser
     {
         /// <summary>
@@ -66,20 +87,32 @@ namespace WarbandParser
             None = 0,
             Dublicate = 1,
             BlockSymbol = 2,
-            DublicateDifferentValue = 4 // Дубликат по id, но с разными значениями.
+            DublicateDifferentValue = 4,
+            ParseError = 8
         }
 
-        public class ModTextRow
+        public class ParseArg
         {
-            public int RowNum { get; set; } = 0;
+            public string Value { get; set; }
 
-            public string RowId { get; set; } = string.Empty;
+            public int Start { get; set; }
 
-            public string OriginalText { get; set; } = string.Empty;
+            public int End { get; set; }
 
-            public string TranslatedText { get; set; } = string.Empty;
+            public ParseArg(string ArgLine, int StartPos = -1, int EndPos = -1)
+            {
+                Value = ArgLine ?? string.Empty;
 
-            public RowFlags Flags { get; set; } = RowFlags.None;
+                Start = StartPos;
+
+                End = EndPos;
+            }
+
+            public static implicit operator ParseArg(string ArgLine) => new ParseArg(ArgLine);
+
+            public static implicit operator string(ParseArg Wrapper) => Wrapper?.Value ?? string.Empty;
+
+            public override string ToString() => Value;
         }
 
         public static bool IsLineStartsWithPrefix(string Input)
@@ -229,9 +262,9 @@ namespace WarbandParser
             return -1;
         }
 
-        private static List<string> ParseTextData(string TextData, string Prefix)
+        private static List<ParseArg> ParseTextData(string TextData, string Prefix)
         {
-            var Result = new List<string> { };
+            var Result = new List<ParseArg> { };
 
             if (string.IsNullOrEmpty(TextData))
                 return Result;
@@ -261,7 +294,12 @@ namespace WarbandParser
                     {
                         if (IsLineStartsWithPrefix(ResultString))
                         {
-                            Result.Add(ResultString);
+                            Result.Add(
+                                new ParseArg(
+                                    ResultString, //
+                                    EnterPos,     //
+                                    EndPos        //
+                                ));
                         }
                     }
                     CurrentPosition = EndPos;
@@ -270,9 +308,9 @@ namespace WarbandParser
             return Result;
         }
 
-        private static List<string> LoadAndParseFile(string FilePath, string Prefix)
+        private static List<ParseArg> LoadAndParseFile(string FilePath, string Prefix)
         {
-            var Result = new List<string>();
+            var Result = new List<ParseArg>();
 
             if (File.Exists(FilePath))
             {
@@ -312,7 +350,9 @@ namespace WarbandParser
                     var DlgaArgs = GetModTextArgs(InfoLine, "dlga_", 2);
 
                     if (DlgaArgs.Count < 2)
+                    {
                         continue;
+                    }
 
                     string LineID = DlgaArgs[0];
 
@@ -321,7 +361,7 @@ namespace WarbandParser
 
                     string OriginalText = DlgaArgs[1].Replace("_", " ");
 
-                    if (OriginalText == "NO VOICEOVER")
+                    if (OriginalText == "NO VOICEOVER") // Конец строки в диалогах. Это ошибка.
                         continue;
 
                     var NewFlags = IsBlockedLine(OriginalText) == true ? RowFlags.BlockSymbol : RowFlags.None;
@@ -561,12 +601,17 @@ namespace WarbandParser
 
                     var NewFlags = IsBlockedLine(MenuText) ? RowFlags.BlockSymbol : RowFlags.None;
 
+                    // Fixme: В DataPos будет позиция блока меню + подменю, а не только меню. (нужно переписать GetModTextArgs, чтобы можно передавать несколько префиксов)
+
+                    var MenuBlock = (FullMenuLine.Start, FullMenuLine.End);
+
                     ModTextResult.Add(
                         new ModTextRow
                         {
                             RowId = MenuID,
                             OriginalText = MenuText,
-                            Flags = NewFlags
+                            Flags = NewFlags,
+                            DataPos = MenuBlock
                         });
 
                     var PartsOfMenu = ParseTextData(FullMenuLine, "mno_");
@@ -591,12 +636,16 @@ namespace WarbandParser
 
                             var PartFlags = IsBlockedLine(PartText) ? RowFlags.BlockSymbol : RowFlags.None;
 
+                            // Т.к блоки с меню читаем, то адреса будут ОТНОСИТЕЛЬНО начала блока menu_.
+                            var MnoLinePos = ((PartMenuLine.Start + FullMenuLine.Start), (PartMenuLine.End + FullMenuLine.Start));
+
                             MnoList.Add(
                                 new ModTextRow
                                 {
                                     RowId = PartID,
                                     OriginalText = PartText,
-                                    Flags = PartFlags
+                                    Flags = PartFlags,
+                                    DataPos = MnoLinePos
                                 });
                         }
                         ModTextResult.AddRange(MnoList);
@@ -1002,7 +1051,8 @@ namespace WarbandParser
             return Result;
         }
 
-        public static bool IsNumber(string Input)
+        /*
+        private static bool IsNumber(string Input)
         {
             if (!string.IsNullOrWhiteSpace(Input))
             {
@@ -1016,9 +1066,9 @@ namespace WarbandParser
 
         private static bool IsSelectorLine(string Input)
         {
-            //
             return false;
         }
+        */
 
         /// <summary>
         /// Функция возвращает только строковые параметры, численные и знаковые значения не обрабатываются..
@@ -1034,7 +1084,7 @@ namespace WarbandParser
             if (string.IsNullOrEmpty(Data) || string.IsNullOrEmpty(Prefix))
                 return Result;
 
-            long FoundedArgs = 0;
+            int FoundedArgs = 0;
 
             bool FoundedPrefix = false;
 
@@ -1066,6 +1116,7 @@ namespace WarbandParser
 
                         FoundedArgs++;
                     }
+                    // Тут надо как-то дополнительно парсить.
 
                     continue;
                 }
@@ -1079,7 +1130,8 @@ namespace WarbandParser
             return Result;
         }
 
-        static List<ModTextRow> GetDuplicateIDs(List<ModTextRow> ModText)
+        /*
+        private static List<ModTextRow> GetDuplicateIDs(List<ModTextRow> ModText)
         {
             return ModText
                 .GroupBy(s => s.RowId)
@@ -1088,7 +1140,7 @@ namespace WarbandParser
                 .ToList();
         }
 
-        static List<ModTextRow> DeleteMarkedIDs(List<ModTextRow> ModText, out int Removed)
+        private static List<ModTextRow> DeleteMarkedIDs(List<ModTextRow> ModText, out int Removed)
         {
             Removed = 0;
 
@@ -1106,8 +1158,7 @@ namespace WarbandParser
             return Result;
         }
 
-        /*
-        static List<ModTextRow> MarkDuplicateIDs(List<ModTextRow> ModText)
+        private static List<ModTextRow> MarkDuplicateIDs(List<ModTextRow> ModText)
         {
             var DuplicateGroups = ModText.GroupBy(x => x.RowId).Where(g => g.Count() > 1).ToList();
 
@@ -1135,7 +1186,7 @@ namespace WarbandParser
         /// </summary>
         /// <param name="ModText"></param>
         /// <returns></returns>
-        public static List<ModTextRow> MarkDuplicateIDs(List<ModTextRow> ModText)
+        private static List<ModTextRow> MarkDuplicateIDs(List<ModTextRow> ModText)
         {
             var Result = new List<ModTextRow>(ModText);
 
@@ -1173,31 +1224,140 @@ namespace WarbandParser
         }
 
         /// <summary>
-        /// Функция для проверки видимости строки.
+        /// 
         /// </summary>
         /// <param name="TextData"></param>
-        /// <returns>Вернёт true, если строка будет видна в таблице.</returns>
-        public static bool IsVisibleRow(ModTextRow TextData)
+        /// <param name="StartIndex"></param>
+        /// <param name="OldLength">Длина ЗАМЕНЯЕМОЙ строки (не NewWord)</param>
+        /// <param name="NewWord"></param>
+        /// <returns></returns>
+        public static string ReplaceWordByIndex(string TextData, int StartIndex, int OldLength, string NewWord)
         {
-            if (TextData != null)
-            {
-                var Flags = TextData.Flags;
+            if (TextData == null || NewWord == null)
+                return string.Empty;
 
-                if (Flags.HasFlag(RowFlags.Dublicate))
+            if (StartIndex < 0 || StartIndex > TextData.Length) // Если индекс выходит за пределы строки
+                return string.Empty;
+
+            if (OldLength < 0 || StartIndex + OldLength > TextData.Length) // Длина выходит за пределы строки.
+                return string.Empty;
+
+            try
+            {
+                string Before = TextData.Substring(0, StartIndex);
+
+                string After = TextData.Substring(StartIndex + OldLength);
+
+                return Before + NewWord + After;
+            }
+            catch(Exception)
+            {
+                return string.Empty;
+            }
+        }
+
+        private static int GetMaxNumSuffix(List<ModTextRow> Data, string RowId, string Suffix)
+        {
+            int MaxSuffixNumber = 0;
+
+            string Pattern = $@"{RowId}{Suffix}(\d+)"; //
+
+            var Reg = new Regex(Pattern, RegexOptions.Compiled);
+
+            foreach (var Row in Data)
+            {
+                var Match = Reg.Match(Row.RowId);
+
+                if (Match.Success)
                 {
-                    if (Flags.HasFlag(RowFlags.Dublicate)) // Если дубликат
-                    {
-                        if (g_DeleteDublicatesIDs) // и мы их удаляем, то
-                            return false; // строка не видна.
-                    }
-                }
-                if (Flags.HasFlag(RowFlags.BlockSymbol)) // Если есть блокирующий символ {!}
-                {
-                    if (!g_IgnoreBlockingSymbol) // и мы НЕ игнорим их, то
-                        return false; // строка не видна.
+                    var CurrentNumber = int.Parse(Match.Groups[1].Value);
+
+                    if (CurrentNumber > MaxSuffixNumber)
+                        MaxSuffixNumber = CurrentNumber;
                 }
             }
-            return true;
+            return MaxSuffixNumber;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="MenuFile"></param>
+        /// <param name="ParsedMenu"></param>
+        /// <param name="Suffix"></param>
+        /// <param name="RenamedIds"></param>
+        /// <param name="Flags"></param>
+        /// <returns></returns>
+        public static string ReCreateMenuFile(string MenuFile, List<ModTextRow> ParsedMenu, string Suffix, out int RenamedIds, RowFlags Flags)
+        {
+            RenamedIds = 0;
+
+            if (!File.Exists(MenuFile) || string.IsNullOrEmpty(Suffix))
+                return string.Empty;
+
+            if (ParsedMenu.Count > 0)
+            {
+                var ResultMenu = EncodingText.ReadTextFileAndConvertTo(MenuFile, Encoding.Unicode);
+
+                if (!string.IsNullOrEmpty(ResultMenu))
+                {
+                    var RelIndex = 0;
+
+                    var WorkedIds = new Dictionary<string, int>(); // id:количество вхождений
+
+                    foreach (var Item in ParsedMenu)
+                    {
+                        var PosStart = Item.DataPos.Start + RelIndex;
+
+                        if (Item.Flags.HasFlag(Flags)) // Только дубликаты
+                        {
+                            if (IsLineStartsWithPrefix(Item.RowId, "mno_")) // и подменю.
+                            {
+                                if (!WorkedIds.ContainsKey(Item.RowId))
+                                {
+                                    var MaxNum = GetMaxNumSuffix(ParsedMenu, Item.RowId, Suffix);
+
+                                    WorkedIds.Add(Item.RowId, MaxNum);
+                                }
+
+                                var CurrentEnter = WorkedIds[Item.RowId]; // Количество вхождений id
+
+                                var NewSuffix = $"{Suffix}{CurrentEnter + 1}";
+
+                                var IdWithSuffix = Item.RowId + NewSuffix; // Пример: mno_continue.wt1
+
+                                ResultMenu = ReplaceWordByIndex(ResultMenu, PosStart, Item.RowId.Length, IdWithSuffix);
+
+                                if (ResultMenu == null)
+                                    return string.Empty;
+
+                                RelIndex += NewSuffix.Length; // Каждая замена строки увеличивает результат на длину суффикса.
+
+                                WorkedIds[Item.RowId] = CurrentEnter + 1;
+
+                                RenamedIds++;
+                            }
+                        }
+                    }
+                }
+                return ResultMenu;
+            }
+            return string.Empty;
+        }
+
+        public static string ReCreateMenuFile(string MenuFile, string Suffix, out int RenamedIds, RowFlags Flags)
+        {
+            RenamedIds = 0;
+
+            if (!File.Exists(MenuFile) || string.IsNullOrEmpty(Suffix))
+                return string.Empty;
+
+            var ParsedMenu = LoadAndParseMenuFile(MenuFile);
+
+            if (ParsedMenu != null)
+                return ReCreateMenuFile(MenuFile, ParsedMenu, Suffix, out RenamedIds, Flags);
+
+            return string.Empty;
         }
 
     }

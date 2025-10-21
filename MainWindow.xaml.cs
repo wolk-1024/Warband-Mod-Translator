@@ -11,9 +11,7 @@
  *  Добавить работу с несколькими категориями одновременно, без перезагрузки таблицы.
  *  Добавить больше горячих клавиш для поиска.
  */
-
 using Microsoft.Win32;
-using ModTranslatorSettings;
 using System.ComponentModel;
 using System.Data;
 using System.IO;
@@ -23,10 +21,12 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
-
+//
 using WarbandAbout;
 using WarbandSearch;
-using static WarbandParser.Parser;
+using WarbandParser;
+using ModTranslatorSettings;
+using EncodingTextFile;
 
 //#nullable disable
 
@@ -73,7 +73,7 @@ namespace ModTranslator
         /// <summary>
         /// Тут все данные для биндинга с таблицей. Id, текст, перевод.
         /// </summary>
-        private List<ModTextRow> g_CurrentMainGridData = new List<ModTextRow>();
+        public List<ModTextRow> g_CurrentMainGridData = new List<ModTextRow>();
 
         /// <summary>
         /// Режим сравнения версий.
@@ -109,7 +109,7 @@ namespace ModTranslator
         /// </summary>
         private readonly SearchWindow g_SearchWindow;
 
-        public class TextImportInfo
+        private class TextImportInfo
         {
             public int SuccessLoaded { get; set; }
 
@@ -257,6 +257,38 @@ namespace ModTranslator
             RefreshMainGrid(g_CurrentMainGridData);
 
             SetTranslateCountLabel();
+        }
+
+        /// <summary>
+        /// Функция для проверки видимости строки.
+        /// </summary>
+        /// <param name="TextData"></param>
+        /// <returns>Вернёт true, если строка будет видна в таблице.</returns>
+        public static bool IsVisibleRow(ModTextRow TextData)
+        {
+            if (TextData != null)
+            {
+                var Flags = TextData.Flags;
+
+                if (Flags.HasFlag(Parser.RowFlags.Dublicate))
+                {
+                    if (Flags.HasFlag(Parser.RowFlags.Dublicate)) // Если дубликат
+                    {
+                        if (Parser.g_DeleteDublicatesIDs) // и мы их удаляем, то
+                            return false; // строка не видна.
+                    }
+                }
+                if (Flags.HasFlag(Parser.RowFlags.BlockSymbol)) // Если есть блокирующий символ {!}
+                {
+                    if (!Parser.g_IgnoreBlockingSymbol) // и мы НЕ игнорим их, то
+                        return false; // строка не видна.
+                }
+                if (Flags.HasFlag(Parser.RowFlags.ParseError)) // Ошибки парсера не показываем.
+                {
+                    return false;
+                }
+            }
+            return true;
         }
 
         /// <summary>
@@ -453,7 +485,7 @@ namespace ModTranslator
             return Result;
         }
 
-        public List<ModTextRow>? ProcessOriginalFiles(string FilePath)
+        public static List<ModTextRow>? ProcessOriginalFiles(string FilePath)
         {
             if (!File.Exists(FilePath))
                 return null;
@@ -468,72 +500,72 @@ namespace ModTranslator
                 {
                     case "conversation.txt":
                         {
-                            Result = LoadAndParseConversationFile(FilePath);
+                            Result = Parser.LoadAndParseConversationFile(FilePath);
                             break;
                         }
                     case "factions.txt":
                         {
-                            Result = LoadAndParseFactionsFile(FilePath);
+                            Result = Parser.LoadAndParseFactionsFile(FilePath);
                             break;
                         }
                     case "info_pages.txt":
                         {
-                            Result = LoadAndParseInfoPagesFile(FilePath);
+                            Result = Parser.LoadAndParseInfoPagesFile(FilePath);
                             break;
                         }
                     case "item_kinds1.txt":
                         {
-                            Result = LoadAndParseItemKindsFile(FilePath);
+                            Result = Parser.LoadAndParseItemKindsFile(FilePath);
                             break;
                         }
                     case "item_modifiers.txt": // Этого файла часто не бывает в модах.
                         {
-                            Result = LoadAndParseItemModifiersFile(FilePath);
+                            Result = Parser.LoadAndParseItemModifiersFile(FilePath);
                             break;
                         }
                     case "menus.txt": // Есть проблемы: в файле ингода содержатся одинаковые id, но имеют разное значение.
                         {
-                            Result = LoadAndParseMenuFile(FilePath);
+                            Result = Parser.LoadAndParseMenuFile(FilePath);
                             break;
                         }
                     case "parties.txt":
                         {
-                            Result = LoadAndParsePartiesFile(FilePath);
+                            Result = Parser.LoadAndParsePartiesFile(FilePath);
                             break;
                         }
                     case "party_templates.txt":
                         {
-                            Result = LoadAndParsePartyTemplatesFile(FilePath);
+                            Result = Parser.LoadAndParsePartyTemplatesFile(FilePath);
                             break;
                         }
                     case "quests.txt":
                         {
-                            Result = LoadAndParseQuestsFile(FilePath);
+                            Result = Parser.LoadAndParseQuestsFile(FilePath);
                             break;
                         }
                     case "quick_strings.txt":
                         {
-                            Result = LoadAndParseQuickStringsFile(FilePath);
+                            Result = Parser.LoadAndParseQuickStringsFile(FilePath);
                             break;
                         }
                     case "skills.txt":
                         {
-                            Result = LoadAndParseSkillsFile(FilePath);
+                            Result = Parser.LoadAndParseSkillsFile(FilePath);
                             break;
                         }
                     case "skins.txt":
                         {
-                            Result = LoadAndParseSkinsFile(FilePath);
+                            Result = Parser.LoadAndParseSkinsFile(FilePath);
                             break;
                         }
                     case "strings.txt":
                         {
-                            Result = LoadAndParseStringsFile(FilePath);
+                            Result = Parser.LoadAndParseStringsFile(FilePath);
                             break;
                         }
                     case "troops.txt":
                         {
-                            Result = LoadAndParseTroopsFile(FilePath);
+                            Result = Parser.LoadAndParseTroopsFile(FilePath);
                             break;
                         }
                 }
@@ -767,7 +799,7 @@ namespace ModTranslator
             {
                 foreach (ModTextRow Data in TranslateData)
                 {
-                    if (IsDummyRow(Data)) // Не импортируем "противобаговую" строку.
+                    if (Parser.IsDummyRow(Data)) // Не импортируем "противобаговую" строку.
                         continue;
 
                     // Чувствителен к регистру.
@@ -873,7 +905,7 @@ namespace ModTranslator
                 {
                     if (WriteDummy == false)
                     {
-                        var Prefix = ExtractPrefixFromId(TextData.RowId);
+                        var Prefix = Parser.ExtractPrefixFromId(TextData.RowId);
 
                         WriteText.WriteLine(Prefix + "1164|Do not delete this line");
 
@@ -1150,7 +1182,7 @@ namespace ModTranslator
 
             g_CompareMode = false;
 
-            string? SelectedCategory = SelectFilesBox.SelectedValue.ToString();
+            var SelectedCategory = SelectFilesBox.SelectedValue.ToString();
 
             if (!string.IsNullOrEmpty(SelectedCategory) && Directory.Exists(g_ModFolderPath))
             {
@@ -1169,6 +1201,20 @@ namespace ModTranslator
                         g_CurrentOriginalFile = FilePath;
                     }
                 }
+            }
+            ActionAfterSelectionChanged();
+        }
+
+        private void ActionAfterSelectionChanged()
+        {
+            var SelectedCategory = SelectFilesBox.SelectedValue.ToString();
+
+            if (!string.IsNullOrEmpty(SelectedCategory))
+            {
+                if (string.Equals(g_BindingsFileNames[SelectedCategory].OriginalFile, "menus.txt"))
+                    g_OptionsWindow.FixMenus.IsEnabled = true;
+                else
+                    g_OptionsWindow.FixMenus.IsEnabled = false;
             }
         }
 
@@ -1375,7 +1421,7 @@ namespace ModTranslator
                     return false;
                 }
 
-                var ModChanges = GetModTextChanges(g_CurrentMainGridData, LoadedData);
+                var ModChanges = Parser.GetModTextChanges(g_CurrentMainGridData, LoadedData);
 
                 if (ModChanges.Count == 0)
                 {
@@ -1592,41 +1638,6 @@ namespace ModTranslator
 
             Window.Owner = this;
         }
-
-        /*
-        private void DataGridColumnHeader_Click(object sender, RoutedEventArgs e)
-        {
-            DataGridColumnHeader? Header = sender as DataGridColumnHeader;
-
-            if (Header != null && IsLoadedTextData())
-            {
-                DataGridColumn Column = Header.Column;
-
-                if (Column.Header.ToString() == "№")
-                {
-                    if (Column != null && Column.CanUserSort)
-                    {
-                        if (Column.SortDirection == null)
-                        {
-                            Column.SortDirection = ListSortDirection.Descending;
-                        }
-                        else if (Column.SortDirection == ListSortDirection.Ascending)
-                        {
-                            Column.SortDirection = ListSortDirection.Descending;
-                        }
-                        else if (Column.SortDirection == ListSortDirection.Descending)
-                        {
-                            Column.SortDirection = ListSortDirection.Ascending;
-                        }
-
-                        g_CurrentMainGridData.Reverse(); // Вместо коллекций и прочего сортируем данные в лоб.
-
-                        RefreshMainGrid(g_CurrentMainGridData);
-                    }
-                }
-            }
-        }
-        */
 
         private static List<string> GetAllColumnText(DataGrid TableData, DataGridColumn Column, bool OnlyVisible = true)
         {

@@ -1,4 +1,6 @@
-﻿using System.Windows;
+﻿using System.IO;
+using System.Windows;
+using Microsoft.Win32;
 
 using ModTranslator;
 using WarbandParser;
@@ -7,6 +9,17 @@ namespace ModTranslatorSettings
 {
     public partial class SettingsWindow : Window
     {
+
+        /// <summary>
+        /// Суффикс для дубликатов id
+        /// </summary>
+        private const string c_DublicateSuffix = ".wt";
+
+        /// <summary>
+        /// Расширение резервных файлов.
+        /// </summary>
+        private const string c_BackupFileExt = ".bak";
+
         /// <summary>
         /// Главное окно.
         /// </summary>
@@ -121,6 +134,74 @@ namespace ModTranslatorSettings
                     g_MainWindow.RefreshMainGridAndSetCount();
                 }
             }
+        }
+
+        private void FixMenus_Click(object sender, RoutedEventArgs e)
+        {
+            if (g_MainWindow != null)
+            {
+                g_MainWindow.DataTextChangedMessage();
+
+                FixMenusDialog(g_MainWindow.g_CurrentOriginalFile);
+            }
+        }
+
+        private string GetNewBackupFileName(string FileName)
+        {
+            string TimeStamp = DateTime.Now.ToString("yyMMddHHmmss");
+
+            var Ext = Path.GetExtension(FileName);
+
+            var Name = Path.GetFileNameWithoutExtension(FileName);
+
+            return Name + "." + TimeStamp + Ext;
+        }
+
+        private string GetNormalFileNameFromBackup(string FileName)
+        {
+            var Ext = Path.GetExtension(FileName);
+
+            var Name = Path.GetFileNameWithoutExtension(FileName);
+
+            Name = Path.GetFileNameWithoutExtension(Name);
+
+            return Name + Ext;
+        }
+
+        private bool FixMenusDialog(string MenuFilePath, bool RewriteBackup = true)
+        {
+            if (!File.Exists(MenuFilePath))
+                return false;
+
+            int RenamedIds = 0;
+
+            var NewMenuText = Parser.ReCreateMenuFile(MenuFilePath, c_DublicateSuffix, out RenamedIds, Parser.RowFlags.Dublicate);
+
+            if (RenamedIds == 0 && !string.IsNullOrEmpty(NewMenuText))
+            {
+                MessageBox.Show("Исправления не требуются", "Меню", MessageBoxButton.OK, MessageBoxImage.Information);
+
+                return true;
+            }
+
+            if (RenamedIds > 0 && !string.IsNullOrEmpty(NewMenuText))
+            {
+                var BackupFullPath = Path.GetDirectoryName(MenuFilePath) + "\\" + GetNewBackupFileName(MenuFilePath);
+
+                var Answer = MessageBox.Show($"Перезаписать {RenamedIds} дублированных ID в \"{MenuFilePath}\" ?\nБудет создана резервная копия \"{BackupFullPath}\"", "Внимание!", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+
+                if (Answer == MessageBoxResult.Yes)
+                {
+                    File.Copy(MenuFilePath, BackupFullPath, RewriteBackup);
+
+                    File.Delete(MenuFilePath);
+
+                    File.WriteAllText(MenuFilePath, NewMenuText);
+
+                    g_MainWindow.ProcessAndLoadOriginalFiles(MenuFilePath);
+                }
+            }
+            return false;
         }
     }
 }
