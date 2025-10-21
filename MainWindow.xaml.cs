@@ -895,7 +895,7 @@ namespace ModTranslator
             return new string(Input.Select(c => g_TextForbiddenChars.GetValueOrDefault(c, c)).ToArray());
         }
 
-        private void ExportModTextToFile(string FilePath)
+        private void ExportModTextToFile(string FilePath, bool EmptyExport)
         {
             bool WriteDummy = false;
 
@@ -916,10 +916,12 @@ namespace ModTranslator
                     {
                         string TranslatedData = TextData.TranslatedText;
 
-                        if (g_OptionsWindow.FreeExport.IsChecked == true)
+                        if (EmptyExport) // Если экспорт только пустых
                         {
                             if (string.IsNullOrEmpty(TranslatedData))
-                                TranslatedData = TextData.OriginalText;
+                                TranslatedData = TextData.OriginalText; // Меняем пустой перевод на оригинал
+                            else
+                                continue; // Если не пустая, то пропускаем запись.
                         }
 
                         if (!string.IsNullOrEmpty(TranslatedData)) // Не записываем в файл поля без перевода. (Возможно стоит?)
@@ -980,7 +982,12 @@ namespace ModTranslator
 
             if (FileDialog.ShowDialog() == true)
             {
-                ExportModTextToFile(FileDialog.FileName);
+                var EmptyExport = g_OptionsWindow.EmptyExport.IsChecked;
+
+                if (EmptyExport == null)
+                    EmptyExport = false;
+
+                ExportModTextToFile(FileDialog.FileName, (bool)EmptyExport);
 
                 g_DataHasBeenChanged = false;
 

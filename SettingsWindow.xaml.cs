@@ -186,6 +186,8 @@ namespace ModTranslatorSettings
 
                 if (Answer == MessageBoxResult.Yes)
                 {
+                    g_MainWindow.DataTextChangedMessage();
+
                     File.Copy(MenuFilePath, BackupFullPath, RewriteBackup);
 
                     File.Delete(MenuFilePath);

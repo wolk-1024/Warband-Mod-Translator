@@ -10,11 +10,12 @@
  *  Тем не менее, пока этого достаточно для перевода 99% контента.
  */
 
-using System.IO;
-using System.Text;
-using System.Text.RegularExpressions;
 //
 using EncodingTextFile;
+using System.IO;
+using System.Security.AccessControl;
+using System.Text;
+using System.Text.RegularExpressions;
 
 namespace WarbandParser
 {
@@ -93,39 +94,33 @@ namespace WarbandParser
 
         public class ParseArg
         {
-            public string Value { get; set; }
+            public string Value { get; set; } = string.Empty;
 
-            public int Start { get; set; }
+            public int Start { get; set; } = -1;
 
-            public int End { get; set; }
+            public int End { get; set; } = -1;
 
-            public ParseArg(string ArgLine, int StartPos = -1, int EndPos = -1)
+            public ParseArg(string ArgVal)
             {
-                Value = ArgLine ?? string.Empty;
-
-                Start = StartPos;
-
-                End = EndPos;
+                Value = ArgVal ?? string.Empty;
             }
 
-            public static implicit operator ParseArg(string ArgLine) => new ParseArg(ArgLine);
-
-            public static implicit operator string(ParseArg Wrapper) => Wrapper?.Value ?? string.Empty;
-
-            public override string ToString() => Value;
-        }
-
-        public static bool IsLineStartsWithPrefix(string Input)
-        {
-            if (!string.IsNullOrEmpty(Input))
+            public ParseArg(string RawVal, int RawStart = -1, int RawEnd = -1)
             {
-                foreach (string Prefix in IdPrefixesList)
-                {
-                    if (Input.StartsWith(Prefix) && Input.EndsWith(string.Empty))
-                        return true;
-                }
+                Value = RawVal ?? string.Empty;
+
+                Start = RawStart;
+
+                End = RawEnd;
             }
-            return false;
+
+            public ParseArg() {}
+
+            public static implicit operator ParseArg(string ArgVal) { return new ParseArg(ArgVal); }
+
+            public static implicit operator string(ParseArg Wrapper) { return Wrapper?.Value ?? string.Empty; }
+
+            public override string ToString() { return Value; }
         }
 
         public static bool IsLineStartsWithPrefix(string Input, string Prefix)
@@ -138,13 +133,40 @@ namespace WarbandParser
             return false;
         }
 
-        public static bool IsLineСontainsPrefix(string Input)
+        public static bool IsLineStartsWithPrefix(string Input)
         {
             if (!string.IsNullOrEmpty(Input))
             {
                 foreach (string Prefix in IdPrefixesList)
                 {
-                    if (Input.IndexOf(Prefix) >= 0 && Input.EndsWith(string.Empty))
+                    if (IsLineStartsWithPrefix(Input, Prefix))
+                        return true;
+                }
+            }
+            return false;
+        }
+
+        private static bool IsLineStartsWithPrefixes(string Input, string[] Prefixes)
+        {
+            if (!string.IsNullOrEmpty(Input))
+            {
+                foreach (var Pref in Prefixes)
+                {
+                    if (!IsLineStartsWithPrefix(Input, Pref))
+                        return false;
+                }
+                return true;
+            }
+            return false;
+        }
+
+        public static bool IsLineСontainsSomePrefix(string Input)
+        {
+            if (!string.IsNullOrEmpty(Input))
+            {
+                foreach (string Prefix in IdPrefixesList)
+                {
+                    if (IsLineStartsWithPrefix(Input))
                         return true;
                 }
             }
@@ -204,7 +226,7 @@ namespace WarbandParser
             }
             return false;
         }
-        
+
         /*
         public static List<ModTextRow> RemoveDublicateIDs(List<ModTextRow> Data, out int DuplicatesRemoved)
         {
@@ -266,10 +288,7 @@ namespace WarbandParser
         {
             var Result = new List<ParseArg> { };
 
-            if (string.IsNullOrEmpty(TextData))
-                return Result;
-
-            if (string.IsNullOrEmpty(Prefix))
+            if (string.IsNullOrEmpty(TextData) || string.IsNullOrEmpty(Prefix))
                 return Result;
 
             if (TextData.Length > 0)
@@ -307,6 +326,60 @@ namespace WarbandParser
             }
             return Result;
         }
+
+        /*
+        // Это новый код, но не тестированный.
+        private static List<ParseArg> ParseTextData(string TextData, string[] Prefixes)
+        {
+            var Result = new List<ParseArg>();
+
+            if (string.IsNullOrEmpty(TextData) || Prefixes.Count() == 0)
+                return Result;
+
+            var RegPrefixes = Prefixes.Select(p => $"{p}\\w+");
+
+            string Pattern = $@"(?:^|\W)({string.Join("|", RegPrefixes)})(?=$|\W)";
+
+            var PrefixesMatches = Regex.Matches(TextData, Pattern);
+
+            for (int Count = 0; Count < PrefixesMatches.Count; Count++)
+            {
+                var CurrentMatch = PrefixesMatches[Count];
+
+                var CurrentVal = CurrentMatch.Value;
+
+                if (IsLineStartsWithPrefixes(CurrentVal.TrimStart(), Prefixes))
+                {
+                    int PosStart = CurrentMatch.Index; // Начальная позиция префикса.
+
+                    var PosEnd = TextData.Length; // Конечная позиция будет концом текста, но
+
+                    if ((Count + 1) < PrefixesMatches.Count) // если количество найденых префиксов будет меньше, чем текущий индекс префикса + 1, то
+                    {
+                        PosEnd = PrefixesMatches[Count + 1].Index; // конечная позиция станет началом следующего префикса.
+                    }
+
+                    var ArgLength = PosEnd - PosStart;
+
+                    var ArgResult = TextData.Substring(PosStart, ArgLength).Trim();
+
+                    Result.Add(
+                        new ParseArg()
+                        {
+                            Value = ArgResult,
+                            Start = PosStart,
+                            End = PosEnd
+                        });
+                }
+            }
+            return Result;
+        }
+
+        public static List<ParseArg> ParseTextData(string TextData, string Prefix)
+        {
+            return ParseTextData(TextData, [Prefix]);
+        }
+        */
 
         private static List<ParseArg> LoadAndParseFile(string FilePath, string Prefix)
         {
