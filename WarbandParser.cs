@@ -3,13 +3,14 @@
  *  
  *  Известные проблемы: 
  *  
- *  1) Если строка, например, в диалогах будет состоять только из чисел, то парсер не сможет их найти, т.к нет пока возможности отделить флаги от текста.
+ *  1) Если строка, например, в меню будет состоять только из чисел, то парсер не сможет их найти, т.к нет пока возможности отделить флаги от текста.
  */
-using EncodingTextFile;
 using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
+//
+using EncodingTextFile;
 
 namespace WarbandParser
 {
@@ -127,7 +128,7 @@ namespace WarbandParser
 
         private static bool IsBlockedLine(string Input)
         {
-            if (!string.IsNullOrEmpty(Input) && !g_IgnoreBlockingSymbol)
+            if (!string.IsNullOrEmpty(Input))
             {
                 var Result = Input.TrimStart(); // Иногда блок стоит не в самом конце, а его разделяют пробелы.
 
@@ -391,6 +392,7 @@ namespace WarbandParser
             return Result;
         }
 
+        /*
         private static OriginalFileHeader GetFileHeader(string FilePath)
         {
             var Result = new OriginalFileHeader();
@@ -406,7 +408,7 @@ namespace WarbandParser
                     if (string.IsNullOrEmpty(FirstLine) || string.IsNullOrEmpty(SecondLine))
                         return Result;
 
-                    var SplitFirstLine = FirstLine.Split(" ");
+                    var SplitFirstLine = FirstLine.Trim().Split(" ");
 
                     if (SplitFirstLine.Count() < 3)
                         return Result;
@@ -418,7 +420,7 @@ namespace WarbandParser
                     if (int.TryParse(SplitFirstLine.Last(), out Ver))
                         Result.Version = Ver;
 
-                    var SplitSecondLine = SecondLine.Split(" "); // В parties.txt почему-то по 2 одинаковых числа. хз зачем второе.
+                    var SplitSecondLine = SecondLine.Trim().Split(" "); // В parties.txt почему-то по 2 одинаковых числа. хз зачем второе.
 
                     int Count;
 
@@ -436,6 +438,7 @@ namespace WarbandParser
             else
                 return -1;
         }
+        */
 
         public static WhoTalking GetDialogueStates(string DialogeLine)
         {
@@ -468,6 +471,48 @@ namespace WarbandParser
             return Result;
         }
 
+        public static DialogLine ParseDialogueLine(string DualogueLine)
+        {
+            var Result = new DialogLine();
+
+            if (IsLineStartsWithPrefix(DualogueLine, "dlga_"))
+            {
+                var AllParams = DualogueLine.Split(" ", StringSplitOptions.RemoveEmptyEntries);
+
+                int CurrentPos = 3;
+
+                // 0 - ID, 1 - флаг диалога, 2 - (пропускаем), 3 - количество чего-то, (это что-то пропускаем), искомый текст (минимум 4-я позиция)
+                if (AllParams.Count() >= CurrentPos)
+                {
+                    int RecN = 0, R = 0; // Общее количество записей
+
+                    if (int.TryParse(AllParams[CurrentPos], out RecN))
+                    {
+                        if (RecN < AllParams.Count())
+                        {
+                            for (R = 0; R < RecN; R++)
+                            {
+                                CurrentPos++; // Пропускаем флаг.
+
+                                int TextParamN = 0; // Количество параметров.
+
+                                if (!int.TryParse(AllParams[(CurrentPos + R) + 1], out TextParamN))
+                                    return Result;
+
+                                CurrentPos += TextParamN;
+                            }
+                            Result.ID = AllParams.First();
+
+                            Result.Text = AllParams[CurrentPos + R + 1];
+
+                            Result.States = GetDialogueStates(DualogueLine);
+                        }
+                    }
+                }
+            }
+            return Result;
+        }
+
         public static List<ModTextRow> LoadAndParseConversationFile(string FilePath)
         {
             var Result = new List<ModTextRow>();
@@ -477,37 +522,35 @@ namespace WarbandParser
 
             var Dialogs = LoadAndParseFile(FilePath, ["dlga_"]);
 
-            if (Dialogs.Count == GetCountEntries(FilePath))
+            if (Dialogs.Count > 0)
             {
                 foreach (var Line in Dialogs)
                 {
                     // ID, Название, Название (мн.числ), 0, Флаги
 
-                    var DialogID = GetStringArg(Line, 1);
+                    var DlgResult = ParseDialogueLine(Line);
 
-                    var DialogText = GetStringArg(Line, 2).Replace("_", " ");
-
-                    if (string.IsNullOrEmpty(DialogID) || string.IsNullOrEmpty(DialogText))
+                    if (string.IsNullOrEmpty(DlgResult.ID) || string.IsNullOrEmpty(DlgResult.Text))
                     {
                         Result.Add(new ModTextRow
                         {
-                            RowId   = DialogID ?? "ERROR_ID",
-                            Flags   = RowFlags.ParseError,
-                            DataPos = (Line.Start, Line.End)
+                            RowId        = DlgResult.ID ?? "PARSER_ERROR",
+                            Flags        = RowFlags.ParseError,
+                            DataPos      = (Line.Start, Line.End)
                         });
 
                         continue;
                     }
 
-                    var NewFlags = IsBlockedLine(DialogText) == true ? RowFlags.BlockSymbol : RowFlags.None;
+                    var DialogText = DlgResult.Text.Replace("_", " ");
 
-                    var DialogStates = GetDialogueStates(Line);
+                    var NewFlags = IsBlockedLine(DialogText) == true ? RowFlags.BlockSymbol : RowFlags.None;
 
                     Result.Add(new ModTextRow
                     {
-                        RowId        = DialogID,
+                        RowId        = DlgResult.ID,
                         OriginalText = DialogText,
-                        Dialogue     = DialogStates,
+                        Dialogue     = DlgResult.States,
                         Flags        = NewFlags,
                         DataPos      = (Line.Start, Line.End)
                     });
@@ -526,7 +569,7 @@ namespace WarbandParser
 
             var Factions = LoadAndParseFile(FilePath, "fac_");
 
-            if (Factions.Count == GetCountEntries(FilePath))
+            if (Factions.Count > 0)
             {
                 foreach (var FacLine in Factions)
                 {
@@ -538,7 +581,7 @@ namespace WarbandParser
                     {
                         Result.Add(new ModTextRow
                         {
-                            RowId   = FactionID ?? "ERROR_ID",
+                            RowId   = FactionID ?? "PARSER_ERROR",
                             Flags   = RowFlags.ParseError,
                             DataPos = (FacLine.Start, FacLine.End)
                         });
@@ -570,7 +613,7 @@ namespace WarbandParser
 
             var InfoPages = LoadAndParseFile(FilePath, "ip_");
 
-            if (InfoPages.Count == GetCountEntries(FilePath))
+            if (InfoPages.Count > 0)
             {
                 foreach (var Page in InfoPages)
                 {
@@ -582,7 +625,7 @@ namespace WarbandParser
                     {
                         Result.Add(new ModTextRow
                         {
-                            RowId = InfoID ?? "ERROR_ID",
+                            RowId = InfoID ?? "PARSER_ERROR",
                             Flags = RowFlags.ParseError,
                             DataPos = (Page.Start, Page.End)
                         });
@@ -631,7 +674,7 @@ namespace WarbandParser
 
             var ItemKinds = LoadAndParseFile(FilePath, "itm_");
 
-            if (ItemKinds.Count == GetCountEntries(FilePath))
+            if (ItemKinds.Count > 0)
             {
                 foreach (var Item in ItemKinds)
                 {
@@ -643,7 +686,7 @@ namespace WarbandParser
                     {
                         Result.Add(new ModTextRow
                         {
-                            RowId   = ItemID ?? "ERROR_ID",
+                            RowId   = ItemID ?? "PARSER_ERROR",
                             Flags   = RowFlags.ParseError,
                             DataPos = (Item.Start, Item.End)
                         });
@@ -690,7 +733,7 @@ namespace WarbandParser
 
             var ItemMods = LoadAndParseFile(FilePath, "imod_");
 
-            if (ItemMods.Count == GetCountEntries(FilePath))
+            if (ItemMods.Count > 0)
             {
                 foreach (var Mod in ItemMods)
                 {
@@ -702,7 +745,7 @@ namespace WarbandParser
                     {
                         Result.Add(new ModTextRow
                         {
-                            RowId   = ModID ?? "ERROR_ID",
+                            RowId   = ModID ?? "PARSER_ERROR",
                             Flags   = RowFlags.ParseError,
                             DataPos = (Mod.Start, Mod.End)
                         });
@@ -746,7 +789,7 @@ namespace WarbandParser
                     {
                         Result.Add(new ModTextRow
                         {
-                            RowId   = SubMenuID ?? "ERROR_ID",
+                            RowId   = SubMenuID ?? "PARSER_ERROR",
                             Flags   = RowFlags.ParseError,
                             DataPos = MnoDataPos
                         });
@@ -777,7 +820,7 @@ namespace WarbandParser
 
             var MenuBlocks = LoadAndParseFile(FilePath, "menu_"); // Читаем блоками.
 
-            if (MenuBlocks.Count() == GetCountEntries(FilePath))
+            if (MenuBlocks.Count() > 0)
             {
                 foreach (var Block in MenuBlocks)
                 {
@@ -789,7 +832,7 @@ namespace WarbandParser
                     {
                         Result.Add(new ModTextRow
                         {
-                            RowId   = MenuID ?? "ERROR_ID",
+                            RowId   = MenuID ?? "PARSER_ERROR",
                             Flags   = RowFlags.ParseError,
                             DataPos = (Block.Start, Block.End)
                         });
@@ -826,7 +869,7 @@ namespace WarbandParser
 
             var Parties = LoadAndParseFile(FilePath, "p_");
 
-            if (Parties.Count == GetCountEntries(FilePath))
+            if (Parties.Count > 0)
             {
                 foreach (var Part in Parties)
                 {
@@ -838,7 +881,7 @@ namespace WarbandParser
                     {
                         Result.Add(new ModTextRow
                         {
-                            RowId   = PartyID ?? "ERROR_ID",
+                            RowId   = PartyID ?? "PARSER_ERROR",
                             Flags   = RowFlags.ParseError,
                             DataPos = (Part.Start, Part.End)
                         });
@@ -870,7 +913,7 @@ namespace WarbandParser
 
             var PartyTemp = LoadAndParseFile(FilePath, "pt_");
 
-            if (PartyTemp.Count == GetCountEntries(FilePath))
+            if (PartyTemp.Count > 0)
             {
                 foreach (var Party in PartyTemp)
                 {
@@ -882,7 +925,7 @@ namespace WarbandParser
                     {
                         Result.Add(new ModTextRow
                         {
-                            RowId   = PartyTempID ?? "ERROR_ID",
+                            RowId   = PartyTempID ?? "PARSER_ERROR",
                             Flags   = RowFlags.ParseError,
                             DataPos = (Party.Start, Party.End)
                         });
@@ -914,7 +957,7 @@ namespace WarbandParser
 
             var AllQuests = LoadAndParseFile(FilePath, "qst_");
 
-            if (AllQuests.Count == GetCountEntries(FilePath))
+            if (AllQuests.Count > 0)
             {
                 foreach (var Quest in AllQuests)
                 {
@@ -926,7 +969,7 @@ namespace WarbandParser
                     {
                         Result.Add(new ModTextRow
                         {
-                            RowId   = QuestID ?? "ERROR_ID",
+                            RowId   = QuestID ?? "PARSER_ERROR",
                             Flags   = RowFlags.ParseError,
                             DataPos = (Quest.Start, Quest.End)
                         });
@@ -975,7 +1018,7 @@ namespace WarbandParser
 
             var QuickStrings = LoadAndParseFile(FilePath, "qstr_");
 
-            if (QuickStrings.Count() == GetCountEntries(FilePath))
+            if (QuickStrings.Count() > 0)
             {
                 foreach (var String in QuickStrings)
                 {
@@ -987,7 +1030,7 @@ namespace WarbandParser
                     {
                         Result.Add(new ModTextRow
                         {
-                            RowId   = StringID ?? "ERROR_ID",
+                            RowId   = StringID ?? "PARSER_ERROR",
                             Flags   = RowFlags.ParseError,
                             DataPos = (String.Start, String.End)
                         });
@@ -1019,7 +1062,7 @@ namespace WarbandParser
 
             var AllSkills = LoadAndParseFile(FilePath, "skl_");
 
-            if (AllSkills.Count == GetCountEntries(FilePath))
+            if (AllSkills.Count > 0)
             {
                 foreach (var Skill in AllSkills)
                 {
@@ -1033,7 +1076,7 @@ namespace WarbandParser
                     {
                         Result.Add(new ModTextRow
                         {
-                            RowId   = SkillID ?? "ERROR_ID",
+                            RowId   = SkillID ?? "PARSER_ERROR",
                             Flags   = RowFlags.ParseError,
                             DataPos = (Skill.Start, Skill.End)
                         });
@@ -1077,7 +1120,7 @@ namespace WarbandParser
 
             var AllSkins = LoadAndParseFile(FilePath, "skinkey_");
 
-            if (AllSkins.Count == GetCountEntries(FilePath))
+            if (AllSkins.Count > 0)
             {
                 foreach (var Skin in AllSkins)
                 {
@@ -1089,7 +1132,7 @@ namespace WarbandParser
                     {
                         Result.Add(new ModTextRow
                         {
-                            RowId   = SkinID ?? "ERROR_ID",
+                            RowId   = SkinID ?? "PARSER_ERROR",
                             Flags   = RowFlags.ParseError,
                             DataPos = (Skin.Start, Skin.End)
                         });
@@ -1119,7 +1162,7 @@ namespace WarbandParser
 
             var AllStrings = LoadAndParseFile(FilePath, "str_");
 
-            if (AllStrings.Count == GetCountEntries(FilePath))
+            if (AllStrings.Count > 0)
             {
                 foreach (var String in AllStrings)
                 {
@@ -1133,7 +1176,7 @@ namespace WarbandParser
                     {
                         Result.Add(new ModTextRow
                         {
-                            RowId   = StringID ?? "ERROR_ID",
+                            RowId   = StringID ?? "PARSER_ERROR",
                             Flags   = RowFlags.ParseError,
                             DataPos = (String.Start, String.End)
                         });
@@ -1201,7 +1244,7 @@ namespace WarbandParser
 
             var Troops = LoadAndParseFile(FilePath, ["trp_"]);
 
-            if (Troops.Count() == GetCountEntries(FilePath))
+            if (Troops.Count() > 0)
             {
                 foreach (var Npc in Troops)
                 {
@@ -1217,7 +1260,7 @@ namespace WarbandParser
                     {
                         Result.Add(new ModTextRow
                         {
-                            RowId   = TroopID ?? "ERROR_ID",
+                            RowId   = TroopID ?? "PARSER_ERROR",
                             Flags   = RowFlags.ParseError,
                             DataPos = (Npc.Start, Npc.End)
                         });

@@ -41,6 +41,10 @@ namespace ModTranslatorSettings
             InitSettingsWindow();
 
             g_MainWindow = Window;
+
+            Parser.g_DeleteDublicatesIDs = !this.ShowDubsID.IsChecked ?? true;
+
+            Parser.g_IgnoreBlockingSymbol = this.ShowBlocksymbols.IsChecked ?? false;
         }
 
         public void CloseWindow()

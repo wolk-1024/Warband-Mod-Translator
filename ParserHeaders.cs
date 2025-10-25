@@ -70,6 +70,14 @@
         public bool Party  = false;
     }
 
+    public class DialogLine
+    {
+        public string ID = "PARSER_ERROR";
+        public string Text = "PARSER_ERROR";
+
+        public WhoTalking? States = null;
+    }
+
     public class ParseArg
     {
         public string Value { get; set; } = string.Empty;

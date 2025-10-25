@@ -3,7 +3,6 @@
  *  
  *  Планы на релизную версию: 
  *  
- *  Сделать работу с дубликатами подменю из menus.txt (важно!)
  *  Исправить недостатки парсера.
  *  Добавить локализацию на английский.
  *  Доработать режим сравнения.
@@ -270,13 +269,10 @@ namespace ModTranslator
             {
                 var Flags = TextData.Flags;
 
-                if (Flags.HasFlag(RowFlags.Dublicate))
+                if (Flags.HasFlag(RowFlags.Dublicate) || Flags.HasFlag(RowFlags.DublicateDifferentValue))
                 {
-                    if (Flags.HasFlag(RowFlags.Dublicate)) // Если дубликат
-                    {
-                        if (Parser.g_DeleteDublicatesIDs) // и мы их удаляем, то
-                            return false; // строка не видна.
-                    }
+                    if (Parser.g_DeleteDublicatesIDs) // и мы их удаляем, то
+                        return false; // строка не видна.
                 }
                 if (Flags.HasFlag(RowFlags.BlockSymbol)) // Если есть блокирующий символ {!}
                 {
