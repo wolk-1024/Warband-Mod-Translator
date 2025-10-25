@@ -1,68 +1,50 @@
 ﻿/*
- *  Парсер v21.10.2025
+ *  Парсер v24.10.2025
  *  
  *  Известные проблемы: 
  *  
- *  Код игнорует численные параметры, т.к я не знаю, как отличить их от мусора (например p_bridge_30 30)
- *  Так же игнорируются значения, полностью состоящие из пробелов, знаков препинания и пустых строк. (например qstr_____ ____)
- *  Не обрабатываются у id слитные конструкции типа: qstr_{!}blabla
- *  
- *  Тем не менее, пока этого достаточно для перевода 99% контента.
+ *  1) Если строка, например, в диалогах будет состоять только из чисел, то парсер не сможет их найти, т.к нет пока возможности отделить флаги от текста.
  */
-
-//
 using EncodingTextFile;
+using System.Globalization;
 using System.IO;
-using System.Security.AccessControl;
 using System.Text;
 using System.Text.RegularExpressions;
 
 namespace WarbandParser
 {
-    /// <summary>
-    /// Класс для биндинга с таблицей
-    /// </summary>
-    public class ModTextRow : ModRowInfo
-    {
-        public int RowNum { get; set; } = 0;
-
-        public string RowId { get; set; } = string.Empty;
-
-        public string OriginalText { get; set; } = string.Empty;
-
-        public string TranslatedText { get; set; } = string.Empty;
-    }
-
-    public class ModRowInfo
-    {
-        public Parser.RowFlags Flags { get; set; } = Parser.RowFlags.None;
-
-        public (int Start, int End) DataPos { get; set; } = (-1, -1); // Позиция данных в оригинальном файле. Используется пока только для menus.txt
-    }
-
     public static class Parser
     {
         /// <summary>
-        /// Удалять дубликаты Id.
+        /// Настройка для удаления дубликатов ID.
         /// </summary>
         public static bool g_DeleteDublicatesIDs = true;
 
         /// <summary>
-        /// Игнорирование {!} в строках. Не трогать.
+        /// Настройка для игнорирование {!} в строках. 
         /// </summary>
         public static bool g_IgnoreBlockingSymbol = false;
 
         /// <summary>
-        /// Регулярка для поиска знаков и цифр.
+        /// Регулярка для не юникод чисел
         /// </summary>
-        private static readonly Regex RegSymbolsAndNumbers = new Regex(@"^[^\p{L}]*$", RegexOptions.Compiled);
+        private static readonly Regex RegOnlyNumbers = new Regex(@"^\s*-?[0-9]+\s*$", RegexOptions.Compiled);
 
         /// <summary>
-        /// Регулярка для слов и знаков
+        /// Не юникод-float и НЕ экспонента.
         /// </summary>
-        private static readonly Regex RegWordsAndSymbols = new Regex(@"^(?=.*\p{L})[\p{L}\p{N}\p{P}\p{S}]+$", RegexOptions.Compiled);
+        private static Regex RegOnlyFloatNumbers = new Regex(@"^[+-]?(?:[0-9]+\.[0-9]+|[0-9]+)(?<!\.[+-]?)$", RegexOptions.Compiled);
 
-        private readonly static string[] IdPrefixesList =
+        /// <summary>
+        /// Регулярка для слов и знаков.
+        /// Юникод-числа и экспоненциальные записи будут считаться строкой.
+        /// </summary>
+        private static readonly Regex RegWordsAndSymbols = new Regex(@"^(?!\s*$)(?!\s*-?[0-9]+(?:\.[0-9]+)?\s*$).+", RegexOptions.Compiled);
+
+        /// <summary>
+        /// Список поддерживаемых префиксов.
+        /// </summary>
+        private readonly static string[] g_IdPrefixesList =
         {
             "dlga_",    // dialogs
             "fac_",     // factions
@@ -82,45 +64,28 @@ namespace WarbandParser
             "ui_"       // ui
         };
 
-        [Flags]
-        public enum RowFlags
+        public static bool IsDummyRow(ModTextRow Data)
         {
-            None = 0,
-            Dublicate = 1,
-            BlockSymbol = 2,
-            DublicateDifferentValue = 4,
-            ParseError = 8
+            var RowId = Data.RowId;
+
+            if (IsLineStartsWithPrefix(RowId))
+            {
+                if (RowId.EndsWith("_1164"))
+                    return true;
+            }
+            return false;
         }
 
-        public class ParseArg
+        public static string ExtractPrefixFromId(string FullID)
         {
-            public string Value { get; set; } = string.Empty;
-
-            public int Start { get; set; } = -1;
-
-            public int End { get; set; } = -1;
-
-            public ParseArg(string ArgVal)
+            if (IsLineStartsWithPrefix(FullID))
             {
-                Value = ArgVal ?? string.Empty;
+                var Result = FullID.Split("_");
+
+                if (Result.Length >= 0)
+                    return Result[0] + "_";
             }
-
-            public ParseArg(string RawVal, int RawStart = -1, int RawEnd = -1)
-            {
-                Value = RawVal ?? string.Empty;
-
-                Start = RawStart;
-
-                End = RawEnd;
-            }
-
-            public ParseArg() {}
-
-            public static implicit operator ParseArg(string ArgVal) { return new ParseArg(ArgVal); }
-
-            public static implicit operator string(ParseArg Wrapper) { return Wrapper?.Value ?? string.Empty; }
-
-            public override string ToString() { return Value; }
+            return string.Empty;
         }
 
         public static bool IsLineStartsWithPrefix(string Input, string Prefix)
@@ -137,7 +102,7 @@ namespace WarbandParser
         {
             if (!string.IsNullOrEmpty(Input))
             {
-                foreach (string Prefix in IdPrefixesList)
+                foreach (string Prefix in g_IdPrefixesList)
                 {
                     if (IsLineStartsWithPrefix(Input, Prefix))
                         return true;
@@ -160,42 +125,9 @@ namespace WarbandParser
             return false;
         }
 
-        public static bool IsLineСontainsSomePrefix(string Input)
-        {
-            if (!string.IsNullOrEmpty(Input))
-            {
-                foreach (string Prefix in IdPrefixesList)
-                {
-                    if (IsLineStartsWithPrefix(Input))
-                        return true;
-                }
-            }
-            return false;
-        }
-
-        /*
-        public static string RemoveAllNumbers(string Input)
-        {
-            try
-            {
-                string Pattern = @"(?<!\S)-?\d*\.?\d+(?!\S)";
-
-                string Result = Regex.Replace(Input, Pattern, string.Empty);
-
-                Result = Regex.Replace(Result, @"\s+", " ").Trim();
-
-                return Result;
-            }
-            catch (Exception)
-            {
-                return "";
-            }
-        }
-        */
-
         private static bool IsBlockedLine(string Input)
         {
-            if (!string.IsNullOrEmpty(Input))
+            if (!string.IsNullOrEmpty(Input) && !g_IgnoreBlockingSymbol)
             {
                 var Result = Input.TrimStart(); // Иногда блок стоит не в самом конце, а его разделяют пробелы.
 
@@ -204,131 +136,149 @@ namespace WarbandParser
             return false;
         }
 
-        private static string RemoveWordFromStart(string Input, string WordToRemove)
+        /// <summary>
+        /// Для любых строк, знаков, включая юникод.
+        /// </summary>
+        /// <param name="Value"></param>
+        /// <returns></returns>
+        private static bool IsStringArg(string Value)
         {
-            if (string.IsNullOrEmpty(Input) || string.IsNullOrEmpty(WordToRemove))
-                return Input;
+            return RegWordsAndSymbols.IsMatch(Value);
+        }
 
-            if (Input.StartsWith(WordToRemove))
-                return Input.Substring(WordToRemove.Length);
+        /// <summary>
+        /// Только обычные не юникод 32-битные числа.
+        /// </summary>
+        /// <param name="Value"></param>
+        /// <returns></returns>
+        private static bool IsInteger32Arg(string Value)
+        {
+            if (RegOnlyNumbers.IsMatch(Value))
+                return int.TryParse(Value, NumberStyles.Integer, CultureInfo.GetCultureInfo("en-US"), out _);
             else
-                return Input;
+                return false;
         }
 
-        public static bool IsDummyRow(ModTextRow Data)
+        /// <summary>
+        /// Только обычные не юникод 64-битные числа.
+        /// </summary>
+        /// <param name="Value"></param>
+        /// <returns></returns>
+        private static bool IsInteger64Arg(string Value)
         {
-            var RowId = Data.RowId;
+            if (RegOnlyNumbers.IsMatch(Value))
+                return Int64.TryParse(Value, NumberStyles.Integer, CultureInfo.GetCultureInfo("en-US"), out _);
+            else
+                return false;
+        }
 
-            if (IsLineStartsWithPrefix(RowId))
+        /// <summary>
+        /// Не пропускает числа вида +100, .100 и 100. и экспоненциальные записи
+        /// </summary>
+        /// <param name="Value"></param>
+        /// <returns></returns>
+        private static bool IsFloatArg(string Value)
+        {
+            if (RegOnlyFloatNumbers.IsMatch(Value))
+                return float.TryParse(Value, NumberStyles.Float, CultureInfo.GetCultureInfo("en-US"), out _);
+            else
+                return false;
+        }
+
+        private static Type? DetectArgType(string Value)
+        {
+            if (!string.IsNullOrEmpty(Value))
             {
-                if (RowId.EndsWith("_1164"))
-                    return true;
+                if (IsInteger32Arg(Value))
+                    return typeof(int);
+
+                if (IsInteger64Arg(Value))
+                    return typeof(Int64);
+
+                if (IsFloatArg(Value))
+                    return typeof(float);
+
+                if (IsStringArg(Value))
+                    return typeof(string);
             }
-            return false;
+            return null;
         }
 
-        /*
-        public static List<ModTextRow> RemoveDublicateIDs(List<ModTextRow> Data, out int DuplicatesRemoved)
+        private static object? GetArgByType(string Data, int ArgNum, Type ArgType)
         {
-            DuplicatesRemoved = 0;
+            if (string.IsNullOrEmpty(Data))
+                return null;
 
-            var Result = new List<ModTextRow>();
+            var TextLines = Data.Split(' ', StringSplitOptions.RemoveEmptyEntries);
 
-            var GroupedData = Data.GroupBy(x => x.RowId);
-
-            foreach (var Group in GroupedData)
+            if (TextLines.Count() >= ArgNum)
             {
-                int GroupCount = Group.Count();
-
-                DuplicatesRemoved += GroupCount - 1;
-
-                var PreferredItem = Group.FirstOrDefault(x => !string.IsNullOrEmpty(x.OriginalText));
-
-                if (PreferredItem == null)
+                if (IsLineStartsWithPrefix(TextLines[0])) // Всегда начинатьcя должно с id
                 {
-                    PreferredItem = Group.First();
-                }
-                Result.Add(PreferredItem);
-            }
-            return Result;
-        }
-        */
+                    var ArgCount = 0;
 
-        private static bool IsWordCharacter(char c)
-        {
-            return char.IsLetterOrDigit(c) || c == '_';
-        }
-
-        private static int GetPrefixEnter(string TextData, int StartPos, string Prefix)
-        {
-            if (string.IsNullOrEmpty(TextData) || StartPos < 0 || string.IsNullOrEmpty(Prefix))
-                return -1;
-
-            int CurrentPos = StartPos;
-
-            while (CurrentPos < TextData.Length) // Пока позиция в строке меньше, чем её длина.
-            {
-                int EnterPos = TextData.IndexOf(Prefix, CurrentPos, StringComparison.Ordinal); // Ищем вхождение префикса
-
-                if (EnterPos == 0) // Если нашли префикс в самом начале, то
-                    return EnterPos; // выходим с результатом.
-
-                if (EnterPos == -1) // Если ничего не нашли, то
-                    return -1; // просто выходим с ошибкой.
-
-                if (!IsWordCharacter(TextData[EnterPos - 1])) // Проверяем предыдущий символ от найденного префикса на наличие символов. Если не пустой, то это ложный префикс.
-                    return EnterPos; // Если пусто, то всё хорошо
-
-                CurrentPos = EnterPos + Prefix.Length; // Текущая позиция = индекс найденного префикса + длина префикса
-            }
-            return -1;
-        }
-
-        private static List<ParseArg> ParseTextData(string TextData, string Prefix)
-        {
-            var Result = new List<ParseArg> { };
-
-            if (string.IsNullOrEmpty(TextData) || string.IsNullOrEmpty(Prefix))
-                return Result;
-
-            if (TextData.Length > 0)
-            {
-                int CurrentPosition = 0; // Текущая позиция в TextData
-
-                while (CurrentPosition < TextData.Length)
-                {
-                    int EnterPos = GetPrefixEnter(TextData, CurrentPosition, Prefix); // Первое вхождения префикса
-
-                    if (EnterPos == -1)
-                        break;
-
-                    int EndPos = GetPrefixEnter(TextData, EnterPos + Prefix.Length, Prefix); // Ищем начало второго вхождения.
-
-                    if (EndPos == -1) // Если его нет, но есть первое, то
-                        EndPos = TextData.Length; // мы в конце данных.
-
-                    var ResultString = TextData.Substring(EnterPos, EndPos - EnterPos).Trim(); // Извлекаем строку и удалем пробелы.
-
-                    if (ResultString != string.Empty)
+                    for (int Count = 0; Count < TextLines.Count(); Count++)
                     {
-                        if (IsLineStartsWithPrefix(ResultString))
+                        var ResultArg = TextLines[Count];
+
+                        if (DetectArgType(ResultArg) == ArgType)
                         {
-                            Result.Add(
-                                new ParseArg(
-                                    ResultString, //
-                                    EnterPos,     //
-                                    EndPos        //
-                                ));
+                            ArgCount++;
+
+                            if (ArgCount == ArgNum)
+                                return ResultArg;
                         }
                     }
-                    CurrentPosition = EndPos;
                 }
             }
-            return Result;
+            return null;
         }
 
-        /*
-        // Это новый код, но не тестированный.
+        /// <summary>Получение строкового параметра</summary>
+        /// <returns>Параметр или string.Empty</returns>
+        private static string GetStringArg(string TextData, int ArgNum)
+        {
+            if (!string.IsNullOrEmpty(TextData))
+            {
+                var Result = GetArgByType(TextData, ArgNum, typeof(string));
+
+                if (Result != null)
+                    return Result.ToString() ?? string.Empty;
+            }
+            return string.Empty;
+        }
+
+        /// <returns>Параметр или null</returns>
+        private static int? GetIntArg(string TextData, int ArgNum)
+        {
+            if (!string.IsNullOrEmpty(TextData))
+            {
+                var Result = GetArgByType(TextData, ArgNum, typeof(int));
+
+                if (Result != null)
+                {
+                    var StrArg = Result.ToString();
+
+                    if (!string.IsNullOrEmpty(StrArg))
+                        return int.Parse(StrArg);
+                }
+            }
+            return null;
+        }
+
+        /// <returns>Параметр или string.Empty</returns>
+        public static string GetAnyArg(string TextData, int ArgNum)
+        {
+            if (!string.IsNullOrEmpty(TextData))
+            {
+                var Result = TextData.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+                if (ArgNum <= Result.Length)
+                    return Result[ArgNum - 1];
+            }
+            return string.Empty;
+        }
+
         private static List<ParseArg> ParseTextData(string TextData, string[] Prefixes)
         {
             var Result = new List<ParseArg>();
@@ -375,13 +325,12 @@ namespace WarbandParser
             return Result;
         }
 
-        public static List<ParseArg> ParseTextData(string TextData, string Prefix)
+        private static List<ParseArg> ParseTextData(string TextData, string Prefix)
         {
             return ParseTextData(TextData, [Prefix]);
         }
-        */
 
-        private static List<ParseArg> LoadAndParseFile(string FilePath, string Prefix)
+        public static List<ParseArg> LoadAndParseFile(string FilePath, string[] Prefixes)
         {
             var Result = new List<ParseArg>();
 
@@ -390,892 +339,15 @@ namespace WarbandParser
                 string TextData = EncodingText.ReadTextFileAndConvertTo(FilePath, Encoding.Unicode);
 
                 if (TextData.Length > 0)
-                    Result = ParseTextData(TextData, Prefix);
+                    Result = ParseTextData(TextData, Prefixes);
             }
             return Result;
         }
 
-        public static string ExtractPrefixFromId(string FullID)
+        public static List<ParseArg> LoadAndParseFile(string FilePath, string Prefix)
         {
-            if (IsLineStartsWithPrefix(FullID))
-            {
-                var Result = FullID.Split("_");
-
-                if (Result.Length >= 0)
-                    return Result[0] + "_";
-            }
-            return string.Empty;
+            return LoadAndParseFile(FilePath, [Prefix]);
         }
-
-        public static List<ModTextRow>? LoadAndParseConversationFile(string FilePath)
-        {
-            if (string.IsNullOrEmpty(FilePath))
-                return null;
-
-            var ModText = LoadAndParseFile(FilePath, "dlga_");
-
-            if (ModText.Count > 0)
-            {
-                var ModTextResult = new List<ModTextRow>();
-
-                foreach (var InfoLine in ModText)
-                {
-                    var DlgaArgs = GetModTextArgs(InfoLine, "dlga_", 2);
-
-                    if (DlgaArgs.Count < 2)
-                    {
-                        continue;
-                    }
-
-                    string LineID = DlgaArgs[0];
-
-                    if (!IsLineStartsWithPrefix(LineID))
-                        return null;
-
-                    string OriginalText = DlgaArgs[1].Replace("_", " ");
-
-                    if (OriginalText == "NO VOICEOVER") // Конец строки в диалогах. Это ошибка.
-                        continue;
-
-                    var NewFlags = IsBlockedLine(OriginalText) == true ? RowFlags.BlockSymbol : RowFlags.None;
-
-                    ModTextResult.Add(new ModTextRow
-                    {
-                        RowId = LineID,
-                        OriginalText = OriginalText,
-                        Flags = NewFlags
-                    });
-                }
-                return MarkDuplicateIDs(ModTextResult);
-            }
-            return null;
-        }
-
-        public static List<ModTextRow>? LoadAndParseFactionsFile(string FilePath)
-        {
-            if (string.IsNullOrEmpty(FilePath))
-                return null;
-
-            var ModText = LoadAndParseFile(FilePath, "fac_");
-
-            if (ModText.Count > 0)
-            {
-                var ModTextResult = new List<ModTextRow>();
-
-                foreach (var FacLine in ModText)
-                {
-                    var FacArgs = GetModTextArgs(FacLine, "fac_", 2);
-
-                    if (FacArgs.Count < 2)
-                        continue;
-
-                    string LineID = FacArgs[0];
-
-                    if (!IsLineStartsWithPrefix(LineID))
-                        return null;
-
-                    string OriginalText = FacArgs[1].Replace("_", " ");
-
-                    OriginalText = RemoveWordFromStart(OriginalText, "{!}"); // Игра вроде как игнорирует блок.символ в фракциях. Поэтому удаляем.
-
-                    ModTextResult.Add(
-                        new ModTextRow
-                        {
-                            RowId = LineID,
-                            OriginalText = OriginalText,
-                            Flags = RowFlags.None
-                        });
-                }
-                return MarkDuplicateIDs(ModTextResult);
-            }
-            return null;
-        }
-
-        public static List<ModTextRow>? LoadAndParseInfoPagesFile(string FilePath)
-        {
-            if (string.IsNullOrEmpty(FilePath))
-                return null;
-
-            var ModText = LoadAndParseFile(FilePath, "ip_");
-
-            if (ModText.Count > 0)
-            {
-                var ModTextResult = new List<ModTextRow>();
-
-                foreach (var InfoLine in ModText)
-                {
-                    var InfoArgs = GetModTextArgs(InfoLine, "ip_", 3);
-
-                    if (InfoArgs.Count < 2)
-                        continue;
-
-                    string OldID = InfoArgs[0];
-
-                    if (!IsLineStartsWithPrefix(OldID))
-                        return null;
-
-                    string IpValue = InfoArgs[1].Replace("_", " ");
-
-                    var NewFlags = IsBlockedLine(IpValue) ? RowFlags.BlockSymbol : RowFlags.None;
-
-                    ModTextResult.Add(
-                        new ModTextRow
-                        {
-                            RowId = OldID,
-                            OriginalText = IpValue,
-                            Flags = NewFlags
-                        });
-
-                    if (InfoArgs.Count == 3)
-                    {
-                        string IpText = InfoArgs[2].Replace("_", " ");
-
-                        string NewID = OldID + "_text"; // ip_name + _text
-
-                        var TextFlags = IsBlockedLine(IpText) ? RowFlags.BlockSymbol : RowFlags.None;
-
-                        ModTextResult.Add(
-                            new ModTextRow
-                            {
-                                RowId = NewID,
-                                OriginalText = IpText,
-                                Flags = TextFlags
-                            });
-                    }
-                }
-                return MarkDuplicateIDs(ModTextResult);
-            }
-            return null;
-        }
-
-        public static List<ModTextRow>? LoadAndParseItemKindsFile(string FilePath)
-        {
-            if (string.IsNullOrEmpty(FilePath))
-                return null;
-
-            var ModText = LoadAndParseFile(FilePath, "itm_");
-
-            if (ModText.Count > 0)
-            {
-                var ModTextResult = new List<ModTextRow>();
-
-                foreach (var ItemLine in ModText)
-                {
-                    var ItemArgs = GetModTextArgs(ItemLine, "itm_", 3);
-
-                    if (ItemArgs.Count < 3) //
-                        continue;
-
-                    string OldID = ItemArgs[0];
-
-                    if (!IsLineStartsWithPrefix(OldID))
-                        return null;
-
-                    string ItemName = ItemArgs[1].Replace("_", " ");
-
-                    string ItemNamePlural = ItemArgs[2].Replace("_", " ");
-
-                    string NewID = OldID + "_pl";
-
-                    //ItemNamePlural += " (plural)";
-
-                    var NewFlags = IsBlockedLine(ItemName) ? RowFlags.BlockSymbol : RowFlags.None;
-
-                    ModTextResult.Add(
-                        new ModTextRow
-                        {
-                            RowId = OldID,
-                            OriginalText = ItemName,
-                            Flags = NewFlags
-                        });
-
-                    ModTextResult.Add(
-                        new ModTextRow
-                        {
-                            RowId = NewID,
-                            OriginalText = ItemNamePlural,
-                            Flags = NewFlags
-                        });
-                }
-                return MarkDuplicateIDs(ModTextResult);
-            }
-            return null;
-        }
-
-        public static List<ModTextRow>? LoadAndParseItemModifiersFile(string FilePath)
-        {
-            if (string.IsNullOrEmpty(FilePath))
-                return null;
-
-            var ModText = LoadAndParseFile(FilePath, "imod_");
-
-            if (ModText.Count > 0)
-            {
-                var ModTextResult = new List<ModTextRow>();
-
-                foreach (var ItemModLine in ModText)
-                {
-                    var ItemModArgs = GetModTextArgs(ItemModLine, "imod_", 2);
-
-                    if (ItemModArgs.Count < 2) //
-                        continue;
-
-                    string LineID = ItemModArgs[0];
-
-                    if (!IsLineStartsWithPrefix(LineID))
-                        return null;
-
-                    string OriginalText = ItemModArgs[1].Replace("_", " ");
-
-                    var NewFlags = IsBlockedLine(OriginalText) ? RowFlags.BlockSymbol : RowFlags.None;
-
-                    ModTextResult.Add(
-                        new ModTextRow
-                        {
-                            RowId = LineID,
-                            OriginalText = OriginalText,
-                            Flags = NewFlags
-                        });
-                }
-                return MarkDuplicateIDs(ModTextResult);
-            }
-            return null;
-        }
-
-        private static List<ModTextRow>? ParseMenuBlock(ParseArg MenuBlock)
-        {
-            var PartsOfMenu = ParseTextData(MenuBlock, "mno_");
-
-            if (PartsOfMenu.Count > 0)
-            {
-                var MnoList = new List<ModTextRow>();
-
-                foreach (var PartMenuLine in PartsOfMenu)
-                {
-                    var PartMenuArgs = GetModTextArgs(PartMenuLine, "mno_", 2);
-
-                    if (PartMenuArgs.Count > 0)
-                    {
-                        var PartID = PartMenuArgs[0];
-
-                        if (!IsLineStartsWithPrefix(PartID))
-                            return null;
-
-                        // Т.к блоки с меню читаем, то адреса будут ОТНОСИТЕЛЬНО начала блока menu_.
-                        var MnoLinePos = ((PartMenuLine.Start + MenuBlock.Start), (PartMenuLine.End + MenuBlock.Start));
-
-                        var PartFlags = RowFlags.None;
-
-                        if (PartMenuArgs.Count < 2) //
-                        {
-                            MnoList.Add(
-                                new ModTextRow
-                                {
-                                    RowId = PartID,
-                                    Flags = RowFlags.ParseError,
-                                    DataPos = MnoLinePos
-                                });
-
-                            continue;
-                        }
-
-                        var PartText = PartMenuArgs[1].Replace('_', ' ');
-
-                        if (IsBlockedLine(PartText))
-                            PartFlags |= RowFlags.BlockSymbol;
-
-                        MnoList.Add(
-                            new ModTextRow
-                            {
-                                RowId = PartID,
-                                OriginalText = PartText,
-                                Flags = PartFlags,
-                                DataPos = MnoLinePos
-                            });
-                    }
-                }
-                return MnoList;
-            }
-            return null;
-        }
-
-        /// <summary>
-        /// Есть проблемы: в menus.txt бывают подменю mno_ дубликаты, но с разными значениями.
-        /// </summary>
-        /// <param name="FilePath"></param>
-        /// <returns></returns>
-        public static List<ModTextRow>? LoadAndParseMenuFile(string FilePath)
-        {
-            if (string.IsNullOrEmpty(FilePath))
-                return null;
-
-            var AllMenuBlocks = LoadAndParseFile(FilePath, "menu_");
-
-            if (AllMenuBlocks.Count > 0)
-            {
-                var ModTextResult = new List<ModTextRow>();
-
-                foreach (var MenuBlock in AllMenuBlocks)
-                {
-                    var MenuArgs = GetModTextArgs(MenuBlock, "menu_", 2);
-
-                    if (MenuArgs.Count < 2)
-                        continue;
-
-                    var MenuID = MenuArgs[0];
-
-                    if (!IsLineStartsWithPrefix(MenuID))
-                        return null;
-
-                    var MenuText = MenuArgs[1].Replace('_', ' ');
-
-                    var NewFlags = IsBlockedLine(MenuText) ? RowFlags.BlockSymbol : RowFlags.None;
-
-                    // Fixme: В DataPos будет позиция блока меню + подменю, а не только меню. (нужно переписать GetModTextArgs, чтобы можно передавать несколько префиксов)
-
-                    ModTextResult.Add(
-                        new ModTextRow
-                        {
-                            RowId = MenuID,
-                            OriginalText = MenuText,
-                            Flags = NewFlags,
-                            DataPos = (MenuBlock.Start, MenuBlock.End)
-                        });
-
-                    var Submenus = ParseMenuBlock(MenuBlock);
-
-                    if (Submenus != null)
-                        ModTextResult.AddRange(Submenus);
-                }
-                return MarkDuplicateIDs(ModTextResult);
-            }
-            return null;
-        }
-
-        public static List<ModTextRow>? LoadAndParsePartiesFile(string FilePath)
-        {
-            if (string.IsNullOrEmpty(FilePath))
-                return null;
-
-            var ModText = LoadAndParseFile(FilePath, "p_");
-
-            if (ModText.Count > 0)
-            {
-                var ModTextResult = new List<ModTextRow>();
-
-                foreach (var PartiesLine in ModText)
-                {
-                    var PartiesArgs = GetModTextArgs(PartiesLine, "p_", 2);
-
-                    if (PartiesArgs.Count < 2) //
-                        continue;
-
-                    string ID = PartiesArgs[0];
-
-                    if (!IsLineStartsWithPrefix(ID))
-                        return null;
-
-                    string OriginalText = PartiesArgs[1].Replace("_", " ");
-
-                    var NewFlags = IsBlockedLine(OriginalText) ? RowFlags.BlockSymbol : RowFlags.None;
-
-                    ModTextResult.Add(
-                        new ModTextRow
-                        {
-                            RowId = ID,
-                            OriginalText = OriginalText,
-                            Flags = NewFlags
-                        });
-                }
-                return MarkDuplicateIDs(ModTextResult);
-            }
-            return null;
-        }
-
-        public static List<ModTextRow>? LoadAndParsePartyTemplatesFile(string FilePath)
-        {
-            if (string.IsNullOrEmpty(FilePath))
-                return null;
-
-            var ModText = LoadAndParseFile(FilePath, "pt_");
-
-            if (ModText.Count > 0)
-            {
-                var ModTextResult = new List<ModTextRow>();
-
-                foreach (var PartiesLine in ModText)
-                {
-                    var PartyTempArgs = GetModTextArgs(PartiesLine, "pt_", 2);
-
-                    if (PartyTempArgs.Count < 2) //
-                        continue;
-
-                    string LineID = PartyTempArgs[0];
-
-                    if (!IsLineStartsWithPrefix(LineID))
-                        return null;
-
-                    string OriginalText = PartyTempArgs[1].Replace("_", " ");
-
-                    var NewFlags = IsBlockedLine(OriginalText) ? RowFlags.BlockSymbol : RowFlags.None;
-
-                    ModTextResult.Add(
-                        new ModTextRow
-                        {
-                            RowId = LineID,
-                            OriginalText = OriginalText,
-                            Flags = NewFlags
-                        });
-                }
-                return MarkDuplicateIDs(ModTextResult);
-            }
-            return null;
-        }
-
-        public static List<ModTextRow>? LoadAndParseQuestsFile(string FilePath)
-        {
-            if (string.IsNullOrEmpty(FilePath))
-                return null;
-
-            var ModText = LoadAndParseFile(FilePath, "qst_");
-
-            if (ModText.Count > 0)
-            {
-                var ModTextResult = new List<ModTextRow>();
-
-                foreach (var QuestLine in ModText)
-                {
-                    var QuestArgs = GetModTextArgs(QuestLine, "qst_", 3);
-
-                    if (QuestArgs.Count < 2)
-                        continue;
-
-                    string OldID = QuestArgs[0];
-
-                    if (!IsLineStartsWithPrefix(OldID))
-                        return null;
-
-                    string Quest = QuestArgs[1].Replace("_", " ");
-
-                    var NewFlags = IsBlockedLine(Quest) ? RowFlags.BlockSymbol : RowFlags.None;
-
-                    ModTextResult.Add(
-                        new ModTextRow
-                        {
-                            RowId = OldID,
-                            OriginalText = Quest,
-                            Flags = NewFlags
-                        });
-
-                    if (QuestArgs.Count == 3)
-                    {
-                        string QuestText = QuestArgs[2].Replace("_", " ");
-
-                        string NewID = OldID + "_text";
-
-                        var TextFlags = IsBlockedLine(QuestText) ? RowFlags.BlockSymbol : RowFlags.None;
-
-                        ModTextResult.Add(
-                            new ModTextRow
-                            {
-                                RowId = NewID,
-                                OriginalText = QuestText,
-                                Flags = TextFlags
-                            });
-                    }
-                }
-                return MarkDuplicateIDs(ModTextResult);
-            }
-            return null;
-        }
-
-        public static List<ModTextRow>? LoadAndParseQuickStringsFile(string FilePath)
-        {
-            if (string.IsNullOrEmpty(FilePath))
-                return null;
-
-            var ModText = LoadAndParseFile(FilePath, "qstr_");
-
-            if (ModText.Count > 0)
-            {
-                var ModTextResult = new List<ModTextRow>();
-
-                foreach (var QuickLine in ModText)
-                {
-                    var QuickArgs = GetModTextArgs(QuickLine, "qstr_", 2);
-
-                    if (QuickArgs.Count < 2) //
-                        continue;
-
-                    string LineID = QuickArgs[0];
-
-                    if (!IsLineStartsWithPrefix(LineID))
-                        return null;
-
-                    string OriginalText = QuickArgs[1].Replace("_", " ");
-
-                    var NewFlags = IsBlockedLine(OriginalText) ? RowFlags.BlockSymbol : RowFlags.None;
-
-                    ModTextResult.Add(
-                        new ModTextRow
-                        {
-                            RowId = LineID,
-                            OriginalText = OriginalText,
-                            Flags = NewFlags
-                        });
-                }
-                return MarkDuplicateIDs(ModTextResult);
-            }
-            return null;
-        }
-
-        public static List<ModTextRow>? LoadAndParseSkillsFile(string FilePath)
-        {
-            if (string.IsNullOrEmpty(FilePath))
-                return null;
-
-            var ModText = LoadAndParseFile(FilePath, "skl_");
-
-            if (ModText.Count > 0)
-            {
-                var ModTextResult = new List<ModTextRow>();
-
-                foreach (var SkillLine in ModText)
-                {
-                    var SkillArgs = GetModTextArgs(SkillLine, "skl_", 3);
-
-                    if (SkillArgs.Count < 3) //
-                        continue;
-
-                    string OldID = SkillArgs[0];
-
-                    if (!IsLineStartsWithPrefix(OldID))
-                        return null;
-
-                    string SkillName = SkillArgs[1].Replace("_", " ");
-
-                    string SkillDescription = SkillArgs[2].Replace("_", " ");
-
-                    string NewID = OldID + "_desc";
-
-                    // Нужны проверки на блок?
-
-                    ModTextResult.Add(
-                        new ModTextRow
-                        {
-                            RowId = OldID,
-                            OriginalText = SkillName,
-                            Flags = RowFlags.None
-                        });
-
-                    ModTextResult.Add(
-                        new ModTextRow
-                        {
-                            RowId = NewID,
-                            OriginalText = SkillDescription,
-                            Flags = RowFlags.None
-                        });
-
-                }
-                return MarkDuplicateIDs(ModTextResult);
-            }
-            return null;
-        }
-
-        public static List<ModTextRow>? LoadAndParseSkinsFile(string FilePath)
-        {
-            if (string.IsNullOrEmpty(FilePath))
-                return null;
-
-            var ModText = LoadAndParseFile(FilePath, "skinkey_");
-
-            if (ModText.Count > 0)
-            {
-                var ModTextResult = new List<ModTextRow>();
-
-                foreach (var SkinsLine in ModText)
-                {
-                    var SkinsArgs = GetModTextArgs(SkinsLine, "skinkey_", 2);
-
-                    if (SkinsArgs.Count < 2) //
-                        continue;
-
-                    string LineID = SkinsArgs[0];
-
-                    if (!IsLineStartsWithPrefix(LineID))
-                        return null;
-
-                    string Skins = SkinsArgs[1].Replace("_", " ");
-
-                    // Нужны проверки на блок?
-
-                    ModTextResult.Add(
-                        new ModTextRow
-                        {
-                            RowId = LineID,
-                            OriginalText = Skins,
-                            Flags = RowFlags.None
-                        });
-                }
-                return MarkDuplicateIDs(ModTextResult);
-            }
-            return null;
-        }
-
-        public static List<ModTextRow>? LoadAndParseStringsFile(string FilePath)
-        {
-            if (string.IsNullOrEmpty(FilePath))
-                return null;
-
-            var ModText = LoadAndParseFile(FilePath, "str_");
-
-            if (ModText.Count > 0)
-            {
-                var ModTextResult = new List<ModTextRow>();
-
-                foreach (var StrLine in ModText)
-                {
-                    var StrArgs = GetModTextArgs(StrLine, "str_", 2);
-
-                    if (StrArgs.Count < 2) //
-                        continue;
-
-                    string LineID = StrArgs[0];
-
-                    if (!IsLineStartsWithPrefix(LineID))
-                        return null;
-
-                    string OriginalText = StrArgs[1].Replace("_", " ");
-
-                    var NewFlags = IsBlockedLine(OriginalText) ? RowFlags.BlockSymbol : RowFlags.None;
-
-                    ModTextResult.Add(
-                        new ModTextRow
-                        {
-                            RowId = LineID,
-                            OriginalText = OriginalText,
-                            Flags = NewFlags
-                        });
-                }
-                return MarkDuplicateIDs(ModTextResult);
-            }
-            return null;
-        }
-
-        public static List<ModTextRow>? LoadAndParseTroopsFile(string FilePath)
-        {
-            if (string.IsNullOrEmpty(FilePath))
-                return null;
-
-            var ModText = LoadAndParseFile(FilePath, "trp_");
-
-            if (ModText.Count > 0)
-            {
-                var ModTextResult = new List<ModTextRow>();
-
-                foreach (var TroopsLine in ModText)
-                {
-                    var TroopsArgs = GetModTextArgs(TroopsLine, "trp_", 3);
-
-                    if (TroopsArgs.Count < 3) //
-                        continue;
-
-                    string OldID = TroopsArgs[0];
-
-                    if (!IsLineStartsWithPrefix(OldID))
-                        return null;
-
-                    string TroopsName = TroopsArgs[1].Replace("_", " ");
-
-                    string TroopsNamePlural = TroopsArgs[2].Replace("_", " ");
-
-                    string NewID = OldID + "_pl";
-
-                    //TroopsNamePlural += " (plural)";
-
-                    var NewFlags = IsBlockedLine(TroopsName) ? RowFlags.BlockSymbol : RowFlags.None;
-
-                    ModTextResult.Add(
-                        new ModTextRow
-                        {
-                            RowId = OldID,
-                            OriginalText = TroopsName,
-                            Flags = NewFlags
-                        });
-
-                    var PluralFlags = IsBlockedLine(TroopsNamePlural) ? RowFlags.BlockSymbol : RowFlags.None;
-
-                    ModTextResult.Add(
-                        new ModTextRow
-                        {
-                            RowId = NewID,
-                            OriginalText = TroopsNamePlural,
-                            Flags = PluralFlags
-                        });
-                }
-                return MarkDuplicateIDs(ModTextResult);
-            }
-            return null;
-        }
-
-        /// <summary>
-        /// Возвращает разницу между новым и старым списком переводов.
-        /// </summary>
-        /// <param name="NewRows">Новый перевод</param>
-        /// <param name="OldRows">Старый перевод</param>
-        /// <returns></returns>
-        public static List<ModTextRow> GetModTextChanges(List<ModTextRow> NewRows, List<ModTextRow> OldRows, StringComparison CompareType = StringComparison.OrdinalIgnoreCase)
-        {
-            var Result = new List<ModTextRow> { };
-
-            foreach (var RowData in NewRows)
-            {
-                var FoundRow = OldRows.FirstOrDefault(x => x.RowId == RowData.RowId); // Ищем в старом переводе строки ID
-
-                if (FoundRow == null) // Если их нет, то значит это новые строки
-                {
-                    Result.Add(RowData); // добавляем в список.
-                }
-                else
-                {
-                    if (!string.Equals(RowData.OriginalText, FoundRow.OriginalText, CompareType)) // Сравниваем оригинальные тексты.
-                    {
-                        Result.Add(RowData); // Если отличаются, то добавляем.
-                    }
-                }
-            }
-            return Result;
-        }
-
-        /*
-        private static bool IsNumber(string Input)
-        {
-            if (!string.IsNullOrWhiteSpace(Input))
-            {
-                Input = Input.Trim();
-
-                if (double.TryParse(Input, out _))
-                    return true;
-            }
-            return false;
-        }
-
-        private static bool IsSelectorLine(string Input)
-        {
-            return false;
-        }
-        */
-
-        /// <summary>
-        /// Функция возвращает только строковые параметры, численные и знаковые значения не обрабатываются..
-        /// </summary>
-        /// <param name="Data"></param>
-        /// <param name="Prefix"></param>
-        /// <param name="MaxArgs"></param>
-        /// <returns></returns>
-        private static List<string> GetModTextArgs(string Data, string Prefix, long MaxArgs = 2)
-        {
-            var Result = new List<string> { };
-
-            if (string.IsNullOrEmpty(Data) || string.IsNullOrEmpty(Prefix))
-                return Result;
-
-            int FoundedArgs = 0;
-
-            bool FoundedPrefix = false;
-
-            var SplitData = Data.Split(" ", StringSplitOptions.RemoveEmptyEntries);
-
-            foreach (var Line in SplitData)
-            {
-                if (FoundedArgs >= MaxArgs)
-                    break;
-
-                if (!FoundedPrefix)
-                {
-                    if (IsLineStartsWithPrefix(Line, Prefix))  // Если id первый параметр
-                    {
-                        Result.Add(Line);
-
-                        FoundedArgs++;
-
-                        FoundedPrefix = true;
-                    }
-                    else
-                        return Result; // Без id не бывает строк.
-                }
-                else if (RegSymbolsAndNumbers.IsMatch(Line)) // Если одни знаки и цифры.
-                {
-                    if (IsBlockedLine(Line))
-                    {
-                        Result.Add(Line);
-
-                        FoundedArgs++;
-                    }
-                    // Тут надо как-то дополнительно парсить.
-
-                    continue;
-                }
-                else if (RegWordsAndSymbols.IsMatch(Line)) // Если в строке есть юникод-буквы и знаки.
-                {
-                    Result.Add(Line);
-
-                    FoundedArgs++;
-                }
-            }
-            return Result;
-        }
-
-        /*
-        private static List<ModTextRow> GetDuplicateIDs(List<ModTextRow> ModText)
-        {
-            return ModText
-                .GroupBy(s => s.RowId)
-                .Where(g => g.Count() > 1)
-                .SelectMany(g => g.Skip(1))
-                .ToList();
-        }
-
-        private static List<ModTextRow> DeleteMarkedIDs(List<ModTextRow> ModText, out int Removed)
-        {
-            Removed = 0;
-
-            var Result = new List<ModTextRow>();
-
-            foreach (var Row in ModText)
-            {
-                var Flags = Row.Flags;
-
-                if (Flags.HasFlag(RowFlags.Dublicate)) // Пропускаем дубликаты.
-                    continue;
-                else
-                    Result.Add(Row);
-            }
-            return Result;
-        }
-
-        private static List<ModTextRow> MarkDuplicateIDs(List<ModTextRow> ModText)
-        {
-            var DuplicateGroups = ModText.GroupBy(x => x.RowId).Where(g => g.Count() > 1).ToList();
-
-            foreach (var Group in DuplicateGroups)
-            {
-                bool IsFirst = true;
-
-                foreach (var Item in Group)
-                {
-                    if (IsFirst)
-                    {
-                        IsFirst = false;
-
-                        continue;
-                    }
-                    Item.Flags |= RowFlags.Dublicate;
-                }
-            }
-            return ModText;
-        }
-        */
 
         /// <summary>
         /// 
@@ -1319,6 +391,900 @@ namespace WarbandParser
             return Result;
         }
 
+        private static OriginalFileHeader GetFileHeader(string FilePath)
+        {
+            var Result = new OriginalFileHeader();
+
+            if (File.Exists(FilePath))
+            {
+                using (var Reader = new StreamReader(FilePath))
+                {
+                    var FirstLine = Reader.ReadLine();
+
+                    var SecondLine = Reader.ReadLine();
+
+                    if (string.IsNullOrEmpty(FirstLine) || string.IsNullOrEmpty(SecondLine))
+                        return Result;
+
+                    var SplitFirstLine = FirstLine.Split(" ");
+
+                    if (SplitFirstLine.Count() < 3)
+                        return Result;
+
+                    Result.Name = SplitFirstLine.First();
+
+                    int Ver;
+
+                    if (int.TryParse(SplitFirstLine.Last(), out Ver))
+                        Result.Version = Ver;
+
+                    var SplitSecondLine = SecondLine.Split(" "); // В parties.txt почему-то по 2 одинаковых числа. хз зачем второе.
+
+                    int Count;
+
+                    if (int.TryParse(SplitSecondLine.First(), out Count))
+                        Result.Entries = Count;
+                }
+            }
+            return Result;
+        }
+
+        private static int GetCountEntries(string FilePath)
+        {
+            if (File.Exists(FilePath))
+                return GetFileHeader(FilePath).Entries;
+            else
+                return -1;
+        }
+
+        public static WhoTalking GetDialogueStates(string DialogeLine)
+        {
+            WhoTalking Result = new WhoTalking();
+
+            if (string.IsNullOrEmpty(DialogeLine))
+                return Result;
+
+            if (IsLineStartsWithPrefix(DialogeLine, "dlga_"))
+            {
+                var DialogueFlags = GetIntArg(DialogeLine, 1);
+
+                if (DialogueFlags != null)
+                {
+                    var Flags = (DialogStates)(DialogueFlags);
+
+                    if (Flags.HasFlag(DialogStates.plyr)) // Строку произносит игрок.
+                        Result.Player = true;
+
+                    if (Flags.HasFlag(DialogStates.anyone)) // Общие диалоги для всех нпс.
+                    {
+                        Result.Anyone = true;
+                    }
+                    else if (Flags.HasFlag(DialogStates.party_tpl)) // Разговор с группой
+                    {
+                        Result.Party = true;
+                    }
+                }
+            }
+            return Result;
+        }
+
+        public static List<ModTextRow> LoadAndParseConversationFile(string FilePath)
+        {
+            var Result = new List<ModTextRow>();
+
+            if (!File.Exists(FilePath))
+                return Result;
+
+            var Dialogs = LoadAndParseFile(FilePath, ["dlga_"]);
+
+            if (Dialogs.Count == GetCountEntries(FilePath))
+            {
+                foreach (var Line in Dialogs)
+                {
+                    // ID, Название, Название (мн.числ), 0, Флаги
+
+                    var DialogID = GetStringArg(Line, 1);
+
+                    var DialogText = GetStringArg(Line, 2).Replace("_", " ");
+
+                    if (string.IsNullOrEmpty(DialogID) || string.IsNullOrEmpty(DialogText))
+                    {
+                        Result.Add(new ModTextRow
+                        {
+                            RowId   = DialogID ?? "ERROR_ID",
+                            Flags   = RowFlags.ParseError,
+                            DataPos = (Line.Start, Line.End)
+                        });
+
+                        continue;
+                    }
+
+                    var NewFlags = IsBlockedLine(DialogText) == true ? RowFlags.BlockSymbol : RowFlags.None;
+
+                    var DialogStates = GetDialogueStates(Line);
+
+                    Result.Add(new ModTextRow
+                    {
+                        RowId        = DialogID,
+                        OriginalText = DialogText,
+                        Dialogue     = DialogStates,
+                        Flags        = NewFlags,
+                        DataPos      = (Line.Start, Line.End)
+                    });
+                }
+                return MarkDuplicateIDs(Result);
+            }
+            return Result;
+        }
+
+        public static List<ModTextRow> LoadAndParseFactionsFile(string FilePath)
+        {
+            var Result = new List<ModTextRow>();
+
+            if (!File.Exists(FilePath))
+                return Result;
+
+            var Factions = LoadAndParseFile(FilePath, "fac_");
+
+            if (Factions.Count == GetCountEntries(FilePath))
+            {
+                foreach (var FacLine in Factions)
+                {
+                    var FactionID = GetStringArg(FacLine, 1);
+
+                    var FactionName = GetStringArg(FacLine, 2).Replace("_", " ");
+
+                    if (string.IsNullOrEmpty(FactionID) || string.IsNullOrEmpty(FactionName))
+                    {
+                        Result.Add(new ModTextRow
+                        {
+                            RowId   = FactionID ?? "ERROR_ID",
+                            Flags   = RowFlags.ParseError,
+                            DataPos = (FacLine.Start, FacLine.End)
+                        });
+
+                        continue;
+                    }
+
+                    var NewFlags = IsBlockedLine(FactionName) ? RowFlags.BlockSymbol : RowFlags.None;
+
+                    Result.Add(new ModTextRow
+                    {
+                        RowId        = FactionID,
+                        OriginalText = FactionName,
+                        Flags        = NewFlags,
+                        DataPos      = (FacLine.Start, FacLine.End)
+                    });
+                }
+                return MarkDuplicateIDs(Result);
+            }
+            return Result;
+        }
+
+        public static List<ModTextRow> LoadAndParseInfoPagesFile(string FilePath)
+        {
+            var Result = new List<ModTextRow>();
+
+            if (!File.Exists(FilePath))
+                return Result;
+
+            var InfoPages = LoadAndParseFile(FilePath, "ip_");
+
+            if (InfoPages.Count == GetCountEntries(FilePath))
+            {
+                foreach (var Page in InfoPages)
+                {
+                    var InfoID = GetAnyArg(Page, 1);
+
+                    var DescriptionText = GetAnyArg(Page, 2).Replace("_", " ");
+
+                    if (string.IsNullOrEmpty(InfoID) || string.IsNullOrEmpty(DescriptionText))
+                    {
+                        Result.Add(new ModTextRow
+                        {
+                            RowId = InfoID ?? "ERROR_ID",
+                            Flags = RowFlags.ParseError,
+                            DataPos = (Page.Start, Page.End)
+                        });
+
+                        continue;
+                    }
+
+                    var NewFlags = IsBlockedLine(DescriptionText) ? RowFlags.BlockSymbol : RowFlags.None;
+
+                    Result.Add(new ModTextRow
+                    {
+                        RowId        = InfoID,
+                        OriginalText = DescriptionText,
+                        Flags        = NewFlags,
+                        DataPos      = (Page.Start, Page.End)
+                    });
+
+                    var InfoText = GetAnyArg(Page, 3).Replace("_", " ");
+
+                    if (!string.IsNullOrEmpty(InfoText)) // Бывают пустые
+                    {
+                        string NewID = InfoID + "_text"; // ip_name + _text
+
+                        NewFlags = IsBlockedLine(InfoText) ? RowFlags.BlockSymbol : RowFlags.None;
+
+                        Result.Add(new ModTextRow
+                        {
+                            RowId        = NewID,
+                            OriginalText = InfoText,
+                            Flags        = NewFlags,
+                            DataPos      = (Page.Start, Page.End)
+                        });
+                    }
+                }
+                return MarkDuplicateIDs(Result);
+            }
+            return Result;
+        }
+
+        public static List<ModTextRow> LoadAndParseItemKindsFile(string FilePath)
+        {
+            var Result = new List<ModTextRow>();
+
+            if (!File.Exists(FilePath))
+                return Result;
+
+            var ItemKinds = LoadAndParseFile(FilePath, "itm_");
+
+            if (ItemKinds.Count == GetCountEntries(FilePath))
+            {
+                foreach (var Item in ItemKinds)
+                {
+                    var ItemID = GetStringArg(Item, 1);
+
+                    var ItemName = GetStringArg(Item, 2).Replace("_", " ");
+
+                    if (string.IsNullOrEmpty(ItemID) || string.IsNullOrEmpty(ItemName))
+                    {
+                        Result.Add(new ModTextRow
+                        {
+                            RowId   = ItemID ?? "ERROR_ID",
+                            Flags   = RowFlags.ParseError,
+                            DataPos = (Item.Start, Item.End)
+                        });
+
+                        continue;
+                    }
+
+                    var NewFlags = IsBlockedLine(ItemName) ? RowFlags.BlockSymbol : RowFlags.None;
+
+                    Result.Add(new ModTextRow
+                    {
+                        RowId        = ItemID,
+                        OriginalText = ItemName,
+                        Flags        = NewFlags,
+                        DataPos      = (Item.Start, Item.End)
+                    });
+
+                    var ItemNamePlural = GetStringArg(Item, 3).Replace("_", " ");
+
+                    NewFlags = IsBlockedLine(ItemNamePlural) ? RowFlags.BlockSymbol : RowFlags.None;
+
+                    string NewID = ItemID + "_pl";
+
+                    Result.Add(new ModTextRow
+                    {
+                        RowId        = NewID,
+                        OriginalText = ItemNamePlural,
+                        Flags        = NewFlags,
+                        DataPos      = (Item.Start, Item.End)
+                    });
+
+                }
+               return MarkDuplicateIDs(Result);
+            }
+            return Result;
+        }
+
+        public static List<ModTextRow> LoadAndParseItemModifiersFile(string FilePath)
+        {
+            var Result = new List<ModTextRow>();
+
+            if (!File.Exists(FilePath))
+                return Result;
+
+            var ItemMods = LoadAndParseFile(FilePath, "imod_");
+
+            if (ItemMods.Count == GetCountEntries(FilePath))
+            {
+                foreach (var Mod in ItemMods)
+                {
+                    var ModID = GetStringArg(Mod, 1);
+
+                    var ModName = GetStringArg(Mod, 2).Replace("_", " ");
+
+                    if (string.IsNullOrEmpty(ModID) || string.IsNullOrEmpty(ModName))
+                    {
+                        Result.Add(new ModTextRow
+                        {
+                            RowId   = ModID ?? "ERROR_ID",
+                            Flags   = RowFlags.ParseError,
+                            DataPos = (Mod.Start, Mod.End)
+                        });
+
+                        continue;
+                    }
+
+                    var NewFlags = IsBlockedLine(ModName) ? RowFlags.BlockSymbol : RowFlags.None;
+
+                    Result.Add(new ModTextRow
+                    {
+                        RowId        = ModID,
+                        OriginalText = ModName,
+                        Flags        = NewFlags,
+                        DataPos      = (Mod.Start, Mod.End)
+                    });
+                }
+                return MarkDuplicateIDs(Result);
+            }
+            return Result;
+        }
+
+        private static List<ModTextRow> ParseMenuBlock(ParseArg MenuBlock)
+        {
+            var Result = new List<ModTextRow>();
+
+            var PartsOfMenu = ParseTextData(MenuBlock, "mno_");
+
+            if (PartsOfMenu.Count() > 0)
+            {
+                foreach (var SubMenu in PartsOfMenu)
+                {
+                    var SubMenuID = GetStringArg(SubMenu, 1);
+
+                    var SubMenuText = GetStringArg(SubMenu, 2).Replace("_", " ");
+
+                    // Т.к мы читаем блоки с меню, то адреса подменю будут ОТНОСИТЕЛЬНО начала menu_.
+                    var MnoDataPos = ((SubMenu.Start + MenuBlock.Start), (SubMenu.End + MenuBlock.Start));
+
+                    if (string.IsNullOrEmpty(SubMenuID) || string.IsNullOrEmpty(SubMenuText))
+                    {
+                        Result.Add(new ModTextRow
+                        {
+                            RowId   = SubMenuID ?? "ERROR_ID",
+                            Flags   = RowFlags.ParseError,
+                            DataPos = MnoDataPos
+                        });
+
+                        continue;
+                    }
+
+                    var NewFlags = IsBlockedLine(SubMenuText) ? RowFlags.BlockSymbol : RowFlags.None;
+
+                    Result.Add(new ModTextRow
+                    {
+                        RowId        = SubMenuID,
+                        OriginalText = SubMenuText,
+                        Flags        = NewFlags,
+                        DataPos      = MnoDataPos
+                    });
+                }
+            }
+            return Result;
+        }
+
+        public static List<ModTextRow> LoadAndParseMenuFile(string FilePath)
+        {
+            var Result = new List<ModTextRow>();
+
+            if (!File.Exists(FilePath))
+                return Result;
+
+            var MenuBlocks = LoadAndParseFile(FilePath, "menu_"); // Читаем блоками.
+
+            if (MenuBlocks.Count() == GetCountEntries(FilePath))
+            {
+                foreach (var Block in MenuBlocks)
+                {
+                    var MenuID = GetStringArg(Block, 1);
+
+                    var MenuText = GetStringArg(Block, 2).Replace('_', ' ');
+
+                    if (string.IsNullOrEmpty(MenuID) || string.IsNullOrEmpty(MenuText))
+                    {
+                        Result.Add(new ModTextRow
+                        {
+                            RowId   = MenuID ?? "ERROR_ID",
+                            Flags   = RowFlags.ParseError,
+                            DataPos = (Block.Start, Block.End)
+                        });
+
+                        continue;
+                    }
+
+                    var NewFlags = IsBlockedLine(MenuText) ? RowFlags.BlockSymbol : RowFlags.None;
+
+                    Result.Add(new ModTextRow
+                    {
+                        RowId        = MenuID,
+                        OriginalText = MenuText,
+                        Flags        = NewFlags,
+                        DataPos      = (Block.Start, Block.End)
+                    });
+
+                    var SubMenus = ParseMenuBlock(Block);
+
+                    if (SubMenus != null)
+                        Result.AddRange(SubMenus);
+                }
+                return MarkDuplicateIDs(Result);
+            }
+            return Result;
+        }
+
+        public static List<ModTextRow> LoadAndParsePartiesFile(string FilePath)
+        {
+            var Result = new List<ModTextRow>();
+
+            if (!File.Exists(FilePath))
+                return Result;
+
+            var Parties = LoadAndParseFile(FilePath, "p_");
+
+            if (Parties.Count == GetCountEntries(FilePath))
+            {
+                foreach (var Part in Parties)
+                {
+                    string PartyID = GetStringArg(Part, 1);
+
+                    string PatrtyName = GetStringArg(Part, 2).Replace("_", " ");
+
+                    if (string.IsNullOrEmpty(PartyID) || string.IsNullOrEmpty(PatrtyName))
+                    {
+                        Result.Add(new ModTextRow
+                        {
+                            RowId   = PartyID ?? "ERROR_ID",
+                            Flags   = RowFlags.ParseError,
+                            DataPos = (Part.Start, Part.End)
+                        });
+
+                        continue;
+                    }
+
+                    var NewFlags = IsBlockedLine(PatrtyName) ? RowFlags.BlockSymbol : RowFlags.None;
+
+                    Result.Add(new ModTextRow
+                    {
+                        RowId        = PartyID,
+                        OriginalText = PatrtyName,
+                        Flags        = NewFlags,
+                        DataPos      = (Part.Start, Part.End)
+                    });
+                }
+                return MarkDuplicateIDs(Result);
+            }
+            return Result;
+        }
+
+        public static List<ModTextRow> LoadAndParsePartyTemplatesFile(string FilePath)
+        {
+            var Result = new List<ModTextRow>();
+
+            if (!File.Exists(FilePath))
+                return Result;
+
+            var PartyTemp = LoadAndParseFile(FilePath, "pt_");
+
+            if (PartyTemp.Count == GetCountEntries(FilePath))
+            {
+                foreach (var Party in PartyTemp)
+                {
+                    string PartyTempID = GetStringArg(Party, 1);
+
+                    string PartyTempName = GetStringArg(Party, 2).Replace("_", " ");
+
+                    if (string.IsNullOrEmpty(PartyTempID) || string.IsNullOrEmpty(PartyTempName))
+                    {
+                        Result.Add(new ModTextRow
+                        {
+                            RowId   = PartyTempID ?? "ERROR_ID",
+                            Flags   = RowFlags.ParseError,
+                            DataPos = (Party.Start, Party.End)
+                        });
+
+                        continue;
+                    }
+
+                    var NewFlags = IsBlockedLine(PartyTempName) ? RowFlags.BlockSymbol : RowFlags.None;
+
+                    Result.Add(new ModTextRow
+                    {
+                        RowId        = PartyTempID,
+                        OriginalText = PartyTempName,
+                        Flags        = NewFlags,
+                        DataPos      = (Party.Start, Party.End)
+                    });
+                }
+                return MarkDuplicateIDs(Result);
+            }
+            return Result;
+        }
+
+        public static List<ModTextRow> LoadAndParseQuestsFile(string FilePath)
+        {
+            var Result = new List<ModTextRow>();
+
+            if (!File.Exists(FilePath))
+                return Result;
+
+            var AllQuests = LoadAndParseFile(FilePath, "qst_");
+
+            if (AllQuests.Count == GetCountEntries(FilePath))
+            {
+                foreach (var Quest in AllQuests)
+                {
+                    string QuestID = GetStringArg(Quest, 1);
+
+                    string QuestName = GetStringArg(Quest, 2).Replace("_", " ");
+
+                    if (string.IsNullOrEmpty(QuestID) || string.IsNullOrEmpty(QuestName))
+                    {
+                        Result.Add(new ModTextRow
+                        {
+                            RowId   = QuestID ?? "ERROR_ID",
+                            Flags   = RowFlags.ParseError,
+                            DataPos = (Quest.Start, Quest.End)
+                        });
+
+                        continue;
+                    }
+
+                    var NewFlags = IsBlockedLine(QuestName) ? RowFlags.BlockSymbol : RowFlags.None;
+
+                    Result.Add(new ModTextRow
+                    {
+                        RowId        = QuestID,
+                        OriginalText = QuestName,
+                        Flags        = NewFlags,
+                        DataPos      = (Quest.Start, Quest.End)
+                    });
+
+                    string QuestText = GetStringArg(Quest, 3).Replace("_", " ");
+
+                    if (!string.IsNullOrEmpty(QuestText)) // Бывают квесты без текста
+                    {
+                        NewFlags = IsBlockedLine(QuestText) ? RowFlags.BlockSymbol : RowFlags.None;
+
+                        string NewID = QuestID + "_text";
+
+                        Result.Add(new ModTextRow
+                        {
+                            RowId        = NewID,
+                            OriginalText = QuestText,
+                            Flags        = NewFlags,
+                            DataPos      = (Quest.Start, Quest.End)
+                        });
+                    }
+                }
+                return MarkDuplicateIDs(Result);
+            }
+            return Result; 
+        }
+
+        public static List<ModTextRow> LoadAndParseQuickStringsFile(string FilePath)
+        {
+            var Result = new List<ModTextRow>();
+
+            if (!File.Exists(FilePath))
+                return Result;
+
+            var QuickStrings = LoadAndParseFile(FilePath, "qstr_");
+
+            if (QuickStrings.Count() == GetCountEntries(FilePath))
+            {
+                foreach (var String in QuickStrings)
+                {
+                    string StringID = GetAnyArg(String, 1);
+
+                    string StringText = GetAnyArg(String, 2).Replace("_", " ");
+
+                    if (string.IsNullOrEmpty(StringID) || string.IsNullOrEmpty(StringText))
+                    {
+                        Result.Add(new ModTextRow
+                        {
+                            RowId   = StringID ?? "ERROR_ID",
+                            Flags   = RowFlags.ParseError,
+                            DataPos = (String.Start, String.End)
+                        });
+
+                        continue;
+                    }
+
+                    var NewFlags = IsBlockedLine(StringText) ? RowFlags.BlockSymbol : RowFlags.None;
+
+                    Result.Add(new ModTextRow
+                    {
+                        RowId        = StringID,
+                        OriginalText = StringText,
+                        Flags        = NewFlags,
+                        DataPos      = (String.Start, String.End)
+                    });
+                }
+                return MarkDuplicateIDs(Result);
+            }
+            return Result;
+        }
+
+        public static List<ModTextRow> LoadAndParseSkillsFile(string FilePath)
+        {
+            var Result = new List<ModTextRow>();
+
+            if (!File.Exists(FilePath))
+                return Result;
+
+            var AllSkills = LoadAndParseFile(FilePath, "skl_");
+
+            if (AllSkills.Count == GetCountEntries(FilePath))
+            {
+                foreach (var Skill in AllSkills)
+                {
+                    string SkillID = GetStringArg(Skill, 1);
+
+                    string SkillName = GetStringArg(Skill, 2).Replace("_", " ");
+
+                    string SkillDescription = GetStringArg(Skill, 3).Replace("_", " ");
+
+                    if (string.IsNullOrEmpty(SkillID) || string.IsNullOrEmpty(SkillName) || string.IsNullOrEmpty(SkillDescription))
+                    {
+                        Result.Add(new ModTextRow
+                        {
+                            RowId   = SkillID ?? "ERROR_ID",
+                            Flags   = RowFlags.ParseError,
+                            DataPos = (Skill.Start, Skill.End)
+                        });
+
+                        continue;
+                    }
+
+                    var NewFlags = IsBlockedLine(SkillName) ? RowFlags.BlockSymbol : RowFlags.None;
+
+                    Result.Add(new ModTextRow
+                    {
+                        RowId        = SkillID,
+                        OriginalText = SkillName,
+                        Flags        = NewFlags,
+                        DataPos      = (Skill.Start, Skill.End)
+                    });
+
+                    NewFlags = IsBlockedLine(SkillDescription) ? RowFlags.BlockSymbol : RowFlags.None;
+
+                    string NewID = SkillID + "_desc";
+
+                    Result.Add(new ModTextRow
+                    {
+                        RowId        = NewID,
+                        OriginalText = SkillDescription,
+                        Flags        = NewFlags,
+                        DataPos      = (Skill.Start, Skill.End)
+                    });
+                }
+                return MarkDuplicateIDs(Result);
+            }
+            return Result;
+        }
+
+        public static List<ModTextRow> LoadAndParseSkinsFile(string FilePath)
+        {
+            var Result = new List<ModTextRow>();
+
+            if (!File.Exists(FilePath))
+                return Result;
+
+            var AllSkins = LoadAndParseFile(FilePath, "skinkey_");
+
+            if (AllSkins.Count == GetCountEntries(FilePath))
+            {
+                foreach (var Skin in AllSkins)
+                {
+                    string SkinID = GetStringArg(Skin, 1);
+
+                    string SkinName = GetStringArg(Skin, 2).Replace("_", " ");
+
+                    if (string.IsNullOrEmpty(SkinID) || string.IsNullOrEmpty(SkinName))
+                    {
+                        Result.Add(new ModTextRow
+                        {
+                            RowId   = SkinID ?? "ERROR_ID",
+                            Flags   = RowFlags.ParseError,
+                            DataPos = (Skin.Start, Skin.End)
+                        });
+
+                        continue;
+                    }
+
+                    Result.Add(new ModTextRow
+                    {
+                        RowId        = SkinID,
+                        OriginalText = SkinName,
+                        Flags        = RowFlags.None,
+                        DataPos      = (Skin.Start, Skin.End)
+                    });
+                }
+                return MarkDuplicateIDs(Result);
+            }
+            return Result;
+        }
+
+        public static List<ModTextRow> LoadAndParseStringsFile(string FilePath)
+        {
+            var Result = new List<ModTextRow>();
+
+            if (!File.Exists(FilePath))
+                return Result;
+
+            var AllStrings = LoadAndParseFile(FilePath, "str_");
+
+            if (AllStrings.Count == GetCountEntries(FilePath))
+            {
+                foreach (var String in AllStrings)
+                {
+                    string StringID = GetAnyArg(String, 1);
+
+                    string StringText = GetAnyArg(String, 2).Replace("_", " ");
+
+                    // Могут быть строки.
+
+                    if (string.IsNullOrEmpty(StringID) || string.IsNullOrEmpty(StringText))
+                    {
+                        Result.Add(new ModTextRow
+                        {
+                            RowId   = StringID ?? "ERROR_ID",
+                            Flags   = RowFlags.ParseError,
+                            DataPos = (String.Start, String.End)
+                        });
+
+                        continue;
+                    }
+
+                    var NewFlags = IsBlockedLine(StringText) ? RowFlags.BlockSymbol : RowFlags.None;
+
+                    Result.Add(new ModTextRow
+                    {
+                        RowId        = StringID,
+                        OriginalText = StringText,
+                        Flags        = NewFlags,
+                        DataPos      = (String.Start, String.End)
+                    });
+                }
+                return MarkDuplicateIDs(Result);
+            }
+            return Result;
+        }
+
+        private static NpcType GetTroopType(string TroopLine)
+        {
+            var Result = new NpcType();
+
+            if (string.IsNullOrEmpty(TroopLine))
+                return Result;
+
+            if (IsLineStartsWithPrefix(TroopLine, "trp_"))
+            {
+                var TroopFlags = GetIntArg(TroopLine, 2);
+
+                if (TroopFlags != null)
+                {
+                    var Flags = (TroopsFlags)(TroopFlags);
+
+                    if (Flags.HasFlag(TroopsFlags.tf_man))
+                        Result.IsMan = true;
+
+                    if (Flags.HasFlag(TroopsFlags.tf_woman))
+                        Result.IsWoman = true;
+
+                    if (Flags.HasFlag(TroopsFlags.tf_hero))
+                        Result.IsHero = true;
+
+                    if (Flags.HasFlag(TroopsFlags.tf_is_merchant))
+                        Result.IsMerchant = true;
+
+                    if ((TroopFlags & 0x0000000f) >= 2)
+                        Result.IsNotHuman = true;
+
+                    // Там ещё куча других флагов, но они не нужны.
+                }
+            }
+            return Result;
+        }
+
+        public static List<ModTextRow> LoadAndParseTroopsFile(string FilePath)
+        {
+            var Result = new List<ModTextRow>();
+
+            if (!File.Exists(FilePath))
+                return Result;
+
+            var Troops = LoadAndParseFile(FilePath, ["trp_"]);
+
+            if (Troops.Count() == GetCountEntries(FilePath))
+            {
+                foreach (var Npc in Troops)
+                {
+                    // ID, Название, Название (мн.числ), 0, Флаги
+
+                    var TroopID = GetStringArg(Npc, 1);
+
+                    var TroopName = GetStringArg(Npc, 2).Replace("_", " ");
+
+                    var TroopNamePlural = GetStringArg(Npc, 3).Replace("_", " ");
+
+                    if (string.IsNullOrEmpty(TroopID) || string.IsNullOrEmpty(TroopName) || string.IsNullOrEmpty(TroopNamePlural))
+                    {
+                        Result.Add(new ModTextRow
+                        {
+                            RowId   = TroopID ?? "ERROR_ID",
+                            Flags   = RowFlags.ParseError,
+                            DataPos = (Npc.Start, Npc.End)
+                        });
+                        continue;
+                    }
+
+                    RowFlags NewFlags = IsBlockedLine(TroopName) ? RowFlags.BlockSymbol : RowFlags.None;
+
+                    var NpcType = GetTroopType(Npc);
+
+                    Result.Add(new ModTextRow
+                    {
+                        RowId        = TroopID,
+                        OriginalText = TroopName,
+                        NPC          = NpcType,
+                        Flags        = NewFlags,
+                        DataPos      = (Npc.Start, Npc.End)
+                    });
+
+                    string NewTroopID = TroopID + "_pl";
+
+                    var PluralFlags = IsBlockedLine(TroopNamePlural) ? RowFlags.BlockSymbol : RowFlags.None;
+
+                    Result.Add(new ModTextRow
+                    {
+                        RowId        = NewTroopID,
+                        OriginalText = TroopNamePlural,
+                        NPC          = NpcType,
+                        Flags        = PluralFlags,
+                        DataPos      = (Npc.Start, Npc.End)
+                    });
+
+                }
+                return MarkDuplicateIDs(Result);
+            }
+            return Result;
+        }
+
+        /// <summary>
+        /// Возвращает разницу между новым и старым списком переводов.
+        /// </summary>
+        /// <param name="NewRows">Новый перевод</param>
+        /// <param name="OldRows">Старый перевод</param>
+        /// <returns></returns>
+        public static List<ModTextRow> GetModTextChanges(List<ModTextRow> NewRows, List<ModTextRow> OldRows, StringComparison CompareType = StringComparison.OrdinalIgnoreCase)
+        {
+            var Result = new List<ModTextRow>();
+
+            foreach (var RowData in NewRows)
+            {
+                var FoundRow = OldRows.FirstOrDefault(x => x.RowId == RowData.RowId); // Ищем в старом переводе строки ID
+
+                if (FoundRow == null) // Если их нет, то значит это новые строки
+                {
+                    Result.Add(RowData); // добавляем в список.
+                }
+                else
+                {
+                    if (!string.Equals(RowData.OriginalText, FoundRow.OriginalText, CompareType)) // Сравниваем оригинальные тексты.
+                    {
+                        Result.Add(RowData); // Если отличаются, то добавляем.
+                    }
+                }
+            }
+            return Result;
+        }
+
         /// <summary>
         /// 
         /// </summary>
@@ -1327,7 +1293,7 @@ namespace WarbandParser
         /// <param name="OldLength">Длина ЗАМЕНЯЕМОЙ строки (не NewWord)</param>
         /// <param name="NewWord"></param>
         /// <returns></returns>
-        public static string ReplaceWordByIndex(string TextData, int StartIndex, int OldLength, string NewWord)
+        private static string ReplaceWordByIndex(string TextData, int StartIndex, int OldLength, string NewWord)
         {
             if (TextData == null || NewWord == null)
                 return string.Empty;
@@ -1346,7 +1312,7 @@ namespace WarbandParser
 
                 return Before + NewWord + After;
             }
-            catch(Exception)
+            catch (Exception)
             {
                 return string.Empty;
             }

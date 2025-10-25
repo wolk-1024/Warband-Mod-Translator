@@ -270,20 +270,20 @@ namespace ModTranslator
             {
                 var Flags = TextData.Flags;
 
-                if (Flags.HasFlag(Parser.RowFlags.Dublicate))
+                if (Flags.HasFlag(RowFlags.Dublicate))
                 {
-                    if (Flags.HasFlag(Parser.RowFlags.Dublicate)) // Если дубликат
+                    if (Flags.HasFlag(RowFlags.Dublicate)) // Если дубликат
                     {
                         if (Parser.g_DeleteDublicatesIDs) // и мы их удаляем, то
                             return false; // строка не видна.
                     }
                 }
-                if (Flags.HasFlag(Parser.RowFlags.BlockSymbol)) // Если есть блокирующий символ {!}
+                if (Flags.HasFlag(RowFlags.BlockSymbol)) // Если есть блокирующий символ {!}
                 {
                     if (!Parser.g_IgnoreBlockingSymbol) // и мы НЕ игнорим их, то
                         return false; // строка не видна.
                 }
-                if (Flags.HasFlag(Parser.RowFlags.ParseError)) // Ошибки парсера не показываем.
+                if (Flags.HasFlag(RowFlags.ParseError)) // Ошибки парсера не показываем.
                 {
                     return false;
                 }

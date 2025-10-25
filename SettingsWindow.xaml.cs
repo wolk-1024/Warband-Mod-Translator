@@ -169,7 +169,7 @@ namespace ModTranslatorSettings
 
             int RenamedIds = 0;
 
-            var NewMenuText = Parser.ReCreateMenuFile(MenuFilePath, c_DublicateSuffix, out RenamedIds, Parser.RowFlags.Dublicate);
+            var NewMenuText = Parser.ReCreateMenuFile(MenuFilePath, c_DublicateSuffix, out RenamedIds, RowFlags.Dublicate);
 
             if (RenamedIds == 0 && !string.IsNullOrEmpty(NewMenuText))
             {
