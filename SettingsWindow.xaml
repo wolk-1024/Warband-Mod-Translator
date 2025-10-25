@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:ModTranslatorSettings"
         mc:Ignorable="d"
-        Title="Настройки" Height="300" Width="300">
+        Title="Настройки" Height="350" Width="300">
 
     <Grid>
 
@@ -17,11 +17,13 @@
 
         <CheckBox x:Name="ShowDubsID" Content="Отображать дубликаты ID" ToolTip="Отобразить в таблице дублированные ID." Margin="15,150,0,0" VerticalAlignment="Top" HorizontalAlignment="Left" Width="200" IsChecked="False" Checked="ShowDubsID_Checked" Unchecked ="ShowDubsID_Unchecked"/>
 
-        <CheckBox x:Name="ShowBlocksymbols" Content="Отображать строки с {!} символом" ToolTip="Отобразить в таблице строки, помеченные игрой блокирующим символом {!}"  HorizontalAlignment="Left" Margin="15,125,0,0" VerticalAlignment="Top" Width="240" Checked="ShowBlocksymbols_Checked" Unchecked="ShowBlocksymbols_Unchecked" IsChecked="True"/>
+        <CheckBox x:Name="ShowBlocksymbols" Content="Отображать строки с {!} символом" ToolTip="Отобразить в таблице строки, помеченные игрой блокирующим символом {!}"  HorizontalAlignment="Left" Margin="15,125,0,0" VerticalAlignment="Top" Width="240" Checked="ShowBlocksymbols_Checked" Unchecked="ShowBlocksymbols_Unchecked" IsChecked="False"/>
 
         <CheckBox x:Name="ImportOnlyInEmpty" Content="Импортировать только в пустые строки" ToolTip="Импортировать только непереведённые строки. По умолчанию импортируемый файл заменяет собой переведенные ранее строки."  HorizontalAlignment="Left" Margin="15,100,0,0" VerticalAlignment="Top" Width="251"/>
 
-        <Button x:Name="FixMenus" Content="Испр. menus.txt" ToolTip="Использовать с острожностью. Перезаписывает все дубликаты id в оригинальном файле menus.txt" HorizontalAlignment="Left" Margin="15,220,0,0" Click="FixMenus_Click" Height="25" Width="95" VerticalAlignment="Top" IsEnabled="False"/>
+        <Button x:Name="FixMenus" Content="Испр. menus.txt" ToolTip="Использовать с острожностью. Перезаписывает все дубликаты id в оригинальном файле menus.txt" HorizontalAlignment="Left" Margin="15,260,0,0" Click="FixMenus_Click" Height="30" Width="100" VerticalAlignment="Top" IsEnabled="False"/>
+        
+        <CheckBox x:Name="ShowNPC" Content="Подсветить персонажей в таблице" ToolTip="Включает подсветку строк с женскими персонажами-людьми (розовый) и тех, кого невозможно определить однозначно (серый)"  HorizontalAlignment="Left" Margin="15,175,0,0" Width="220" Height="15" VerticalAlignment="Top" Checked="ShowFemales_Checked" Unchecked="ShowFemales_Unchecked" IsChecked="True"/>
 
     </Grid>
 </Window>

@@ -456,15 +456,15 @@ namespace WarbandParser
                     var Flags = (DialogStates)(DialogueFlags);
 
                     if (Flags.HasFlag(DialogStates.plyr)) // Строку произносит игрок.
-                        Result.Player = true;
+                        Result.IsPlayer = true;
 
                     if (Flags.HasFlag(DialogStates.anyone)) // Общие диалоги для всех нпс.
                     {
-                        Result.Anyone = true;
+                        Result.IsAnyone = true;
                     }
                     else if (Flags.HasFlag(DialogStates.party_tpl)) // Разговор с группой
                     {
-                        Result.Party = true;
+                        Result.IsParty = true;
                     }
                 }
             }
@@ -501,11 +501,15 @@ namespace WarbandParser
 
                                 CurrentPos += TextParamN;
                             }
-                            Result.ID = AllParams.First();
 
-                            Result.Text = AllParams[CurrentPos + R + 1];
+                            var ResPos = CurrentPos + R + 1;
 
-                            Result.States = GetDialogueStates(DualogueLine);
+                            if (ResPos <= AllParams.Length)
+                            {
+                                Result.ID = AllParams.First(); // ID диалога (dlga_ramun и т.д)
+                                Result.Text = AllParams[ResPos]; // Текст реплики.
+                                Result.States = GetDialogueStates(DualogueLine);
+                            }
                         }
                     }
                 }
@@ -1199,6 +1203,7 @@ namespace WarbandParser
             return Result;
         }
 
+        // FixmeЖ
         private static NpcType GetTroopType(string TroopLine)
         {
             var Result = new NpcType();
@@ -1214,20 +1219,20 @@ namespace WarbandParser
                 {
                     var Flags = (TroopsFlags)(TroopFlags);
 
-                    if (Flags.HasFlag(TroopsFlags.tf_man))
-                        Result.IsMan = true;
+                    var Sex = (TroopFlags & 0x0000000f);
 
-                    if (Flags.HasFlag(TroopsFlags.tf_woman))
+                    if (Sex == 0)
+                        Result.IsMan = true;
+                    else if (Sex == 1)
                         Result.IsWoman = true;
+                    else if (Sex >= 2)
+                        Result.IsOther = true;
 
                     if (Flags.HasFlag(TroopsFlags.tf_hero))
                         Result.IsHero = true;
 
                     if (Flags.HasFlag(TroopsFlags.tf_is_merchant))
                         Result.IsMerchant = true;
-
-                    if ((TroopFlags & 0x0000000f) >= 2)
-                        Result.IsNotHuman = true;
 
                     // Там ещё куча других флагов, но они не нужны.
                 }
@@ -1282,14 +1287,14 @@ namespace WarbandParser
 
                     string NewTroopID = TroopID + "_pl";
 
-                    var PluralFlags = IsBlockedLine(TroopNamePlural) ? RowFlags.BlockSymbol : RowFlags.None;
+                    NewFlags = IsBlockedLine(TroopNamePlural) ? RowFlags.BlockSymbol : RowFlags.None;
 
                     Result.Add(new ModTextRow
                     {
                         RowId        = NewTroopID,
                         OriginalText = TroopNamePlural,
                         NPC          = NpcType,
-                        Flags        = PluralFlags,
+                        Flags        = NewFlags,
                         DataPos      = (Npc.Start, Npc.End)
                     });
 

@@ -2,17 +2,20 @@
  *  (c) wolk-1024
  *  
  *  Планы на релизную версию: 
- *  
+ * 
+ *  Добавить работу с несколькими категориями одновременно, без перезагрузки таблицы. (важно)
  *  Исправить недостатки парсера.
  *  Добавить локализацию на английский.
  *  Доработать режим сравнения.
  *  Доработать поиск.
- *  Добавить работу с несколькими категориями одновременно, без перезагрузки таблицы.
  *  Добавить больше горячих клавиш для поиска.
  */
+using EncodingTextFile;
 using Microsoft.Win32;
+using ModTranslatorSettings;
 using System.ComponentModel;
 using System.Data;
+using System.Drawing;
 using System.IO;
 using System.Reflection;
 using System.Text;
@@ -20,12 +23,11 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
+using System.Windows.Media;
 //
 using WarbandAbout;
-using WarbandSearch;
 using WarbandParser;
-using ModTranslatorSettings;
-using EncodingTextFile;
+using WarbandSearch;
 
 //#nullable disable
 
@@ -38,6 +40,21 @@ namespace ModTranslator
         public int AppWidth = 1366;
 
         public int AppHeight = 768;
+
+        /// <summary>
+        /// Цвет строк\ячеек по умолчанию.
+        /// </summary>
+        private SolidColorBrush DefaultRowColor = Brushes.White;
+
+        /// <summary>
+        /// Цвет подсветки строк с женскими персонажами.
+        /// </summary>
+        private SolidColorBrush FemalesColor = Brushes.Pink;
+
+        /// <summary>
+        /// Цвет для неизвестных.
+        /// </summary>
+        private SolidColorBrush UnknownsColor = Brushes.LightGray;
 
         /// <summary>
         /// Станет true, если ячейка перевода будет изменена.
@@ -595,39 +612,6 @@ namespace ModTranslator
             return false;
         }
 
-        // Fixme: Вызывает срабатывание SelectFilesBox_SelectionChanged
-        private int LoadOriginalFilesToFileBox(string FolderPath)
-        {
-            var Result = 0;
-
-            var NewFilesList = new List<string> { };
-
-            for (int i = 0; i < g_BindingsFileNames.Count; i++)
-            {
-                var FileNames = g_BindingsFileNames.Values.ElementAt(i);
-
-                var TitleName = g_BindingsFileNames.Keys.ElementAt(i);
-
-                var OrginalFilePath = FolderPath + "\\" + FileNames.OriginalFile;
-
-                if (File.Exists(OrginalFilePath))
-                {
-                    Result++;
-
-                    NewFilesList.Add(TitleName);
-                }
-            }
-            if (Result > 0)
-            {
-                SelectFilesBox.ItemsSource = NewFilesList; // Херня вызывает срабатывание SelectFilesBox_SelectionChanged как итог файл может грузиться более 1 раза.
-
-                SelectFilesBox.SelectedIndex = 0; // Начинаем список с 1 позиции. Не трогать.
-
-                SelectFilesBox.Items.Refresh();
-            }
-            return Result;
-        }
-
         private static object? GetDataGridCellValue(DataGridCellInfo CellInfo)
         {
             var Binding = new Binding();
@@ -838,7 +822,8 @@ namespace ModTranslator
             {
                 if (Item is ModTextRow TextMod)
                 {
-                    if (IsVisibleRow(TextMod))
+                    // Считаем все, включая скрытые, но не ошибки.
+                    if (!TextMod.Flags.HasFlag(RowFlags.ParseError))
                     {
                         if (!string.IsNullOrEmpty(TextMod.TranslatedText))
                             TranslatedCount++;
@@ -873,14 +858,18 @@ namespace ModTranslator
             return GetVisibleCount(MainDataGrid);
         }
 
-        public void SetTranslateCountLabel(long TranslateLines, long AllLines)
+        public void SetTranslateCountLabel(long TranslateLines)
         {
-            TranslateCount.Content = string.Format("Переведено: {0}\\{1}", TranslateLines, AllLines);
+            var Hiden = MainDataGrid.Items.Count - GetVisibleCount();
+
+            //var NeedToTranslate = MainDataGrid.Items.Count - TranslateLines;
+
+            TranslateCount.Content = string.Format($"Загружено: {MainDataGrid.Items.Count} | Скрыто: {Hiden} | Переведено: {TranslateLines}");
         }
 
         public void SetTranslateCountLabel()
         {
-            SetTranslateCountLabel(HowManyTranslatedLines(), GetVisibleCount());
+            SetTranslateCountLabel(HowManyTranslatedLines());
         }
 
         private string ReplaceForbiddenChars(string Input)
@@ -1061,7 +1050,7 @@ namespace ModTranslator
 
                         g_DataHasBeenChanged = true;
                     }
-                    SetTranslateCountLabel(TranslatedLines, GetVisibleCount());
+                    SetTranslateCountLabel(TranslatedLines);
 
                     g_CurrentCellValue = string.Empty;
                 }
@@ -1177,6 +1166,39 @@ namespace ModTranslator
                     return (RowIndex, ColumnIndex);
             }
             return (-1, -1);
+        }
+
+        // Fixme: Вызывает срабатывание SelectFilesBox_SelectionChanged
+        private int LoadOriginalFilesToFileBox(string FolderPath)
+        {
+            var Result = 0;
+
+            var NewFilesList = new List<string> { };
+
+            for (int i = 0; i < g_BindingsFileNames.Count; i++)
+            {
+                var FileNames = g_BindingsFileNames.Values.ElementAt(i);
+
+                var TitleName = g_BindingsFileNames.Keys.ElementAt(i);
+
+                var OrginalFilePath = FolderPath + "\\" + FileNames.OriginalFile;
+
+                if (File.Exists(OrginalFilePath))
+                {
+                    Result++;
+
+                    NewFilesList.Add(TitleName);
+                }
+            }
+            if (Result > 0)
+            {
+                SelectFilesBox.ItemsSource = NewFilesList; // Херня вызывает срабатывание SelectFilesBox_SelectionChanged как итог файл может грузиться более 1 раза.
+
+                SelectFilesBox.SelectedIndex = 0; // Начинаем список с 1 позиции. Не трогать.
+
+                SelectFilesBox.Items.Refresh();
+            }
+            return Result;
         }
 
         private void SelectFilesBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -1726,7 +1748,7 @@ namespace ModTranslator
                         {
                             int LineIndex = 0, ItemCount = 0;
 
-                            while ((ItemCount < MainDataGrid.Items.Count) && (LineIndex < AllLines.Length))
+                            while ((ItemCount < TableGrid.Items.Count) && (LineIndex < AllLines.Length)) //
                             {
                                 var RowData = GetRowDataByIndex(ItemCount);
 
@@ -1810,9 +1832,9 @@ namespace ModTranslator
             {
                 var CurrentColumn = TableGrid.CurrentColumn;
 
-                var ColumnName = CurrentColumn.Header.ToString();
+                var ColumnIndex = CurrentColumn.DisplayIndex;
 
-                if (ColumnName == "№")
+                if (ColumnIndex == 0)
                     e.Handled = true;
             }
         }
@@ -1834,11 +1856,88 @@ namespace ModTranslator
             if (ModText != null)
             {
                 if (!IsVisibleRow(ModText)) // Если строка помечена.
+                {
                     RowData.Visibility = Visibility.Collapsed;  // скрываем ее
+                }
                 else
+                {
                     RowData.Visibility = Visibility.Visible;
+
+                    //DataGridRow Row = (DataGridRow)MainDataGrid.ItemContainerGenerator.ContainerFromItem(ModText);
+
+                    RowData.ToolTip = GetRowToolTipText(ModText);
+
+                    if (g_OptionsWindow != null && ModText.NPC != null)
+                    {
+                        var ShowNpc = g_OptionsWindow.ShowNPC.IsChecked ?? true; // По умолчанию включено.
+
+                        if (ModText.NPC.IsWoman)
+                        {
+                            if (ShowNpc)
+                                RowData.Background = FemalesColor;
+                        }
+                        else if (ModText.NPC.IsOther)
+                        {
+                            if (ShowNpc)
+                                RowData.Background = UnknownsColor;
+                        }
+                        else 
+                            RowData.Background = DefaultRowColor;
+                    }
+                }
             }
         }
+
+        private string? GetRowToolTipText(ModTextRow? Mod)
+        {
+            StringBuilder Text = new StringBuilder();
+
+            if (Mod != null)
+            {
+                // Войска
+                if (Mod.NPC != null)
+                {
+                    var Npc = Mod.NPC;
+
+                    if (Npc.IsOther)
+                        Text.AppendLine("Неизвестно");
+                    else
+                        Text.AppendLine("Человек");
+
+                    if (!Npc.IsOther)
+                    {
+                        if (Npc.IsWoman)
+                            Text.AppendLine("Женщина");
+                        else
+                            Text.AppendLine("Мужчина");
+                    }
+
+                    if (Npc.IsHero)
+                        Text.AppendLine("Герой");
+
+                    if (Npc.IsMerchant)
+                        Text.AppendLine("Торговец");
+
+                    if (Text.Length > 0)
+                        return Text.ToString().Trim();
+                }
+                // Диалоги
+                else if (Mod.Dialogue != null)
+                {
+                    var Dialogue = Mod.Dialogue;
+
+                    if (Dialogue.IsPlayer && Dialogue.IsAnyone)
+                        Text.AppendLine("Игрок говорит с NPC");
+                    else if (Dialogue.IsAnyone)
+                        Text.AppendLine("NPC говорит с игроком");
+
+                    if (Text.Length > 0)
+                        return Text.ToString().Trim();
+                }
+            }
+            return null;
+        }
+
 
     }
 }

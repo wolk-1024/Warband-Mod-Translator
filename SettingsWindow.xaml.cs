@@ -25,7 +25,7 @@ namespace ModTranslatorSettings
         {
             this.Width = 300;
 
-            this.Height = 300;
+            this.Height = 350;
 
             this.ResizeMode = ResizeMode.NoResize;
 
@@ -130,6 +130,28 @@ namespace ModTranslatorSettings
                 if (g_MainWindow.IsLoadedTextData())
                 {
                     g_MainWindow.RefreshMainGridAndSetCount();
+                }
+            }
+        }
+
+        private void ShowFemales_Checked(object sender, RoutedEventArgs e)
+        {
+            if (g_MainWindow != null)
+            {
+                if (g_MainWindow.IsLoadedTextData())
+                {
+                    g_MainWindow.MainDataGrid.Items.Refresh();
+                }
+            }
+        }
+
+        private void ShowFemales_Unchecked(object sender, RoutedEventArgs e)
+        {
+            if (g_MainWindow != null)
+            {
+                if (g_MainWindow.IsLoadedTextData())
+                {
+                    g_MainWindow.MainDataGrid.Items.Refresh();
                 }
             }
         }

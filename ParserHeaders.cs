@@ -35,7 +35,7 @@
     {
         public bool IsMan      = false;  // По умолчанию нпс обычно мужик
         public bool IsWoman    = false;  // Нпс-женщина
-        public bool IsNotHuman = false;  // Нпс НЕ человек, а например гуль или робот
+        public bool IsOther    = false;  // Нпс не человек, а например гуль или робот
         public bool IsHero     = false;  // Нпс-герой
         public bool IsMerchant = false;  // Нпс-торговец
     }
@@ -46,8 +46,8 @@
     [Flags]
     public enum TroopsFlags
     {
-        tf_man = 0,                  //
-        tf_woman = 1,                //
+        //tf_man = 0,                //
+        //tf_woman = 1,              //
         tf_hero = 0x00000010,        //
         tf_is_merchant = 0x00001000, //
     }
@@ -65,9 +65,9 @@
 
     public class WhoTalking
     {
-        public bool Player = false;
-        public bool Anyone = false;
-        public bool Party  = false;
+        public bool IsPlayer = false;
+        public bool IsAnyone = false;
+        public bool IsParty  = false;
     }
 
     public class DialogLine

@@ -126,7 +126,7 @@
 
         <Button x:Name="ImportButton" Grid.Column="2" Content="Импорт перевода" Margin="0,37,151,0" VerticalAlignment="Top" Height="31" HorizontalAlignment="Right" Width="110" IsEnabled="False" Click="ImportButton_Click"/>
 
-        <Label x:Name="TranslateCount" Content="Переведено: 0\0" HorizontalAlignment="Left" Margin="105,81,0,0" VerticalAlignment="Top" Width="130" FontSize="11" Height="25" Grid.Column="1"/>
+        <Label x:Name="TranslateCount" Content="Всего: 0 | Cкрыто: 0 | Переведено: 0" ToolTip="Скрытые строки могут быть переведены." HorizontalAlignment="Left" Margin="105,81,0,0" VerticalAlignment="Top" Width="350" FontSize="11" Height="25" Grid.Column="1"/>
 
         <Button x:Name="NextCellButton" Content="След." ToolTip="Перейти к следующей непереведённой строке" HorizontalAlignment="Left" Margin="55,81,0,0" VerticalAlignment="Top" Height="25" Width="40" Grid.Column="1" IsEnabled="False" Click="NextCellButton_Click"/>
 
