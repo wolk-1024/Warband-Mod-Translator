@@ -10,12 +10,9 @@
  *  Доработать поиск.
  *  Добавить больше горячих клавиш для поиска.
  */
-using EncodingTextFile;
 using Microsoft.Win32;
-using ModTranslatorSettings;
 using System.ComponentModel;
 using System.Data;
-using System.Drawing;
 using System.IO;
 using System.Reflection;
 using System.Text;
@@ -28,6 +25,8 @@ using System.Windows.Media;
 using WarbandAbout;
 using WarbandParser;
 using WarbandSearch;
+using ModTranslatorSettings;
+using EncodingTextFile;
 
 //#nullable disable
 
@@ -35,26 +34,96 @@ namespace ModTranslator
 {
     public partial class MainTranslatorWindow : Window
     {
-        public string AppTitle = "Warband Mod Translator v0.9";
+        public static class Settings
+        {
+            public static string AppTitle = "Warband Mod Translator v1.0b";
 
-        public int AppWidth = 1366;
+            /// <summary>
+            /// Допустимые разделители в csv файлах.
+            /// Для Warband ['|']
+            /// Для Google Sheets [',']
+            /// </summary>
+            public static readonly char[] CsvSeparators = { '|', ',' };
 
-        public int AppHeight = 768;
+            /// <summary>
+            /// Список замен знаков, которые искаженно отображаются в игре. (Из-за шрифтов или ещё чего - я хз)
+            /// </summary>
+            public static readonly Dictionary<char, char> ForbiddenChars = new Dictionary<char, char>
+            {
+                { '—', '-' }
+              //{ 'ё', 'е' },
+              //{ 'Ё', 'Е' }
+            };
 
-        /// <summary>
-        /// Цвет строк\ячеек по умолчанию.
-        /// </summary>
-        private SolidColorBrush DefaultRowColor = Brushes.White;
+            /// <summary>
+            /// Цвет строк\ячеек по умолчанию.
+            /// </summary>
+            public static SolidColorBrush DefaultRowColor = Brushes.White;
 
-        /// <summary>
-        /// Цвет подсветки строк с женскими персонажами.
-        /// </summary>
-        private SolidColorBrush FemalesColor = Brushes.Pink;
+            /// <summary>
+            /// Цвет подсветки строк с женскими персонажами.
+            /// </summary>
+            public static SolidColorBrush FemalesColor = Brushes.Pink;
 
-        /// <summary>
-        /// Цвет для неизвестных.
-        /// </summary>
-        private SolidColorBrush UnknownsColor = Brushes.LightGray;
+            /// <summary>
+            /// Цвет для неизвестных строк.
+            /// </summary>
+            public static SolidColorBrush UnknownsColor = Brushes.LightGray;
+        }
+
+        public class WorkLoad
+        {
+            public class ModInfo
+            {
+                public bool IsChanged    { get; set; } = true;
+
+                public string FileName   { get; set; } = string.Empty;
+                public string ExportName { get; set; } = string.Empty;
+                public string Category   { get; set; } = string.Empty;
+
+                public List<ModTextRow>? Rows { get; set; } = null;
+            }
+            /// <summary>
+            /// Все данные для загрузки и экпорта файлов мода.
+            /// </summary>
+            public static readonly List<ModInfo> BindingsList = new List<ModInfo>
+            {
+                new ModInfo { FileName = "conversation.txt",    ExportName = "dialogs.csv",         Category = "Диалоги" },
+                new ModInfo { FileName = "factions.txt",        ExportName = "factions.csv",        Category = "Фракции" },
+                new ModInfo { FileName = "info_pages.txt",      ExportName = "info_pages.csv",      Category = "Страницы информации" },
+                new ModInfo { FileName = "item_kinds1.txt",     ExportName = "item_kinds.csv",      Category = "Виды предметов" },
+                new ModInfo { FileName = "item_modifiers.txt",  ExportName = "item_modifiers.csv",  Category = "Состояние предметов" },
+                new ModInfo { FileName = "menus.txt",           ExportName = "game_menus.csv",      Category = "Игровое меню" },
+                new ModInfo { FileName = "parties.txt",         ExportName = "parties.csv" ,        Category = "Места" },
+                new ModInfo { FileName = "party_templates.txt", ExportName = "party_templates.csv", Category = "Шаблоны мест" },
+                new ModInfo { FileName = "quests.txt",          ExportName = "quests.csv",          Category = "Задания" },
+                new ModInfo { FileName = "quick_strings.txt",   ExportName = "quick_strings.csv",   Category = "Быстрые строки" },
+                new ModInfo { FileName = "skills.txt",          ExportName = "skills.csv",          Category = "Навыки" },
+                new ModInfo { FileName = "skins.txt",           ExportName = "skins.csv" ,          Category = "Скины" },
+                new ModInfo { FileName = "strings.txt",         ExportName = "game_strings.csv",    Category = "Игровые строки" },
+                new ModInfo { FileName = "troops.txt",          ExportName = "troops.csv",          Category = "Войска" }
+            };
+
+            public static ModInfo? FindByCategory(string CategoryName, StringComparison Compare = StringComparison.OrdinalIgnoreCase)
+            {
+                return BindingsList.FirstOrDefault(x => (x != null) && string.Equals(x.Category, CategoryName, Compare), null);
+            }
+
+            public static ModInfo? FindByFile(string FileName, StringComparison Compare = StringComparison.OrdinalIgnoreCase)
+            {
+                return BindingsList.FirstOrDefault(x => (x != null) && string.Equals(x.Category, FileName, Compare), null);
+            }
+
+            public static List<string> GetChangedCategories()
+            {
+                return BindingsList.Where(x => x.IsChanged).Select(x => x.Category).ToList();
+            }
+
+            public static List<ModInfo> GetBindings() 
+            {
+                return BindingsList; 
+            }
+        }
 
         /// <summary>
         /// Станет true, если ячейка перевода будет изменена.
@@ -72,6 +141,11 @@ namespace ModTranslator
         public string g_CurrentOriginalFile = string.Empty;
 
         /// <summary>
+        /// Режим сравнения версий.
+        /// </summary>
+        public bool g_CompareMode = false;
+
+        /// <summary>
         /// // Путь к .csv переводу.
         /// </summary>
         public string g_FileForExport = string.Empty;
@@ -85,35 +159,6 @@ namespace ModTranslator
         /// Индекс текущей выделенной ячейки.
         /// </summary>
         public (int RowIndex, int ColumnIndex) g_CurrentSelectedCell = (-1, -1);
-
-        /// <summary>
-        /// Тут все данные для биндинга с таблицей. Id, текст, перевод.
-        /// </summary>
-        public List<ModTextRow> g_CurrentMainGridData = new List<ModTextRow>();
-
-        /// <summary>
-        /// Режим сравнения версий.
-        /// </summary>
-        public bool g_CompareMode = false;
-
-        /// <summary>
-        /// Допустимые разделители в csv файлах.
-        /// Для Warband ['|']
-        /// Для Google Sheets [',']
-        /// </summary>
-        public static char[] g_CsvFileSeparators = { '|', ',' };
-
-        /// <summary>
-        /// Глобалка со списком замен знаков, которые искаженно отображаются в игре.
-        /// </summary>
-        private static readonly Dictionary<char, char> g_TextForbiddenChars = new Dictionary<char, char>
-        {
-            { '—', '-' }
-            //{ 'ё', 'е' },
-            //{ 'Ё', 'Е' }
-        };
-
-        //private List<CollectionTextData> g_CollectionTextData = new List<CollectionTextData>(); //
 
         /// <summary>
         /// Окно настроек.
@@ -132,35 +177,9 @@ namespace ModTranslator
             public List<ModTextRow> FailedLoad = new List<ModTextRow> { };
         }
 
-        /// <summary>
-        /// Данные для FileBox
-        /// </summary>
-        private static readonly Dictionary<string, (string OriginalFile, string CsvFile)> g_BindingsFileNames = new Dictionary<string, (string, string)>
-        {
-            // Категории               Файлы мода             Файлы перевода
-            { "Диалоги",             ("conversation.txt",    "dialogs.csv") },
-            { "Фракции",             ("factions.txt",        "factions.csv") },
-            { "Страницы информации", ("info_pages.txt",      "info_pages.csv") },
-            { "Виды предметов",      ("item_kinds1.txt",     "item_kinds.csv") },
-            { "Состояние предметов", ("item_modifiers.txt",  "item_modifiers.csv") },
-            { "Игровое меню",        ("menus.txt",           "game_menus.csv")},
-            { "Места",               ("parties.txt",         "parties.csv") },
-            { "Шаблоны мест",        ("party_templates.txt", "party_templates.csv") },
-            { "Задания",             ("quests.txt",          "quests.csv") },
-            { "Быстрые строки",      ("quick_strings.txt",   "quick_strings.csv") },
-            { "Навыки",              ("skills.txt",          "skills.csv") },
-            { "Скины",               ("skins.txt",           "skins.csv") },
-            { "Игровые строки",      ("strings.txt",         "game_strings.csv") },
-            { "Войска",              ("troops.txt",          "troops.csv") },
-        };
-
         public void InitMainWindow()
         {
-            this.Title = AppTitle;
-
-            this.Width = AppWidth;
-
-            this.Height = AppHeight;
+            this.Title = Settings.AppTitle;
 
             this.WindowState = WindowState.Maximized;
 
@@ -182,13 +201,17 @@ namespace ModTranslator
             g_SearchWindow = new SearchWindow(this);
         }
 
-        private void MainWindowClosing(object? sender, System.ComponentModel.CancelEventArgs e)
+        private void MainWindowClosing(object? sender, CancelEventArgs e)
         {
-            if (g_DataHasBeenChanged)
-            {
-                MessageBoxResult Result = MessageBox.Show("Данные были изменены. Выйти без сохранения?", "Подтверждение", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+            var ListName = WorkLoad.GetChangedCategories();
 
-                if (Result == MessageBoxResult.Yes)
+            if (ListName.Count > 0 && IsLoadDataGrid())
+            {
+                string Categories = string.Join(", ", ListName);
+
+                var Result = AskIfModDataChanged("Выйти без их сохранения?", "Подтверждение", MessageBoxImage.Warning);
+
+                if (Result == 1)
                     e.Cancel = false;
                 else
                 {
@@ -202,9 +225,30 @@ namespace ModTranslator
             g_SearchWindow.CloseWindow();
         }
 
+        /// <summary>
+        /// -1 данные не изменены. 1 - да. 0 - нет.
+        /// </summary>
+        public int AskIfModDataChanged(string MessageIfChanged, string Caption, MessageBoxImage Image)
+        {
+            var ListName = WorkLoad.GetChangedCategories();
+
+            if (ListName.Count > 0 && IsLoadDataGrid())
+            {
+                string Categories = string.Join(", ", ListName);
+
+                MessageBoxResult Result = MessageBox.Show($"Данные были изменены в: {Categories}\n\n{MessageIfChanged}", Caption, MessageBoxButton.YesNo, Image);
+
+                if (Result == MessageBoxResult.Yes)
+                    return 1;
+                else if (Result == MessageBoxResult.No)
+                    return 0;
+            }
+            return -1;
+        }
+
         public void DataTextChangedMessage()
         {
-            if (g_DataHasBeenChanged && IsLoadedTextData())
+            if (g_DataHasBeenChanged && IsLoadDataGrid())
             {
                 MessageBoxResult Message = MessageBox.Show("Данные не сохранены. Сохранить?", "Подтверждение", MessageBoxButton.YesNo, MessageBoxImage.Warning);
 
@@ -215,64 +259,84 @@ namespace ModTranslator
             }
         }
 
-        public bool IsLoadedTextData()
-        {
-            return (MainDataGrid.Items.Count > 0 && File.Exists(g_CurrentOriginalFile));
-        }
-
         private void EnableControlButtons()
         {
-            ImportButton.IsEnabled = true;
+            SelectFilesBox.IsEnabled = true;
+
+            ImportButton.IsEnabled   = true;
 
             PrevCellButton.IsEnabled = true;
 
             NextCellButton.IsEnabled = true;
 
-            SaveButton.IsEnabled = true;
+            SaveButton.IsEnabled     = true;
         }
 
-        private void UnloadMainGrid()
+        public bool IsLoadDataGrid()
         {
-            if (IsLoadedTextData())
-            {
-                g_CurrentSelectedCell = (-1, -1);
+            return (MainDataGrid.Items.Count > 0 && File.Exists(g_CurrentOriginalFile));
+        }
 
-                g_CurrentCellValue = string.Empty;
+        /// <summary>
+        /// Возвращает биндинг с таблицей. Id, текст, перевод и т.д
+        /// </summary>
+        private List<ModTextRow> GetMainRows()
+        {
+            var Bindings = MainDataGrid.ItemsSource as List<ModTextRow>;
 
-                MainDataGrid.ItemsSource = null;
+            if (Bindings != null)
+                return Bindings;
 
-                MainDataGrid.Items.Refresh();
+            return new List<ModTextRow>();
+        }
 
-                g_CurrentMainGridData.Clear();
-            }
+        /// <summary>
+        /// 
+        /// </summary>
+        private WorkLoad.ModInfo? GetCurrentMod()
+        {
+            var Bindings = MainDataGrid.ItemsSource as List<ModTextRow>;
+
+            if (Bindings != null)
+                return WorkLoad.BindingsList.Find(x => (x.Rows == Bindings));
+
+            return null;
         }
 
         /// <summary>
         /// Обновляет таблицу, подсчитывает видимые строки.
         /// </summary>
         /// <param name="TextData"></param>
-        private void RefreshMainGrid(List<ModTextRow> TextData)
+        private void RefreshMainGrid(List<ModTextRow> Rows)
         {
-            UpdateVisibleRowsNumbers(TextData);
+            UpdateVisibleRowsNumbers(Rows);
 
             g_CurrentSelectedCell = (-1, -1);
 
-            g_CurrentMainGridData = TextData;
-
             MainDataGrid.ItemsSource = null;
 
-            MainDataGrid.ItemsSource = TextData;
+            MainDataGrid.ItemsSource = Rows;
 
             MainDataGrid.Items.Refresh();
 
-            FocusFirstVisibleRow();
+            //FocusFirstVisibleRow();
+        }
+
+        public void RefreshMainGrid()
+        {
+            RefreshMainGrid(GetMainRows());
+        }
+
+        public void RefreshMainGridAndSetCount(List<ModTextRow> Rows)
+        {
+            RefreshMainGrid(Rows);
+
+            SetTranslateCountLabel();
         }
 
         public void RefreshMainGridAndSetCount()
         {
-            RefreshMainGrid(g_CurrentMainGridData);
-
-            SetTranslateCountLabel();
+            RefreshMainGridAndSetCount(GetMainRows());
         }
 
         /// <summary>
@@ -592,26 +656,6 @@ namespace ModTranslator
             return Result;
         }
 
-        public bool ProcessAndLoadOriginalFiles(string FilePath)
-        {
-            if (!File.Exists(FilePath))
-                return false;
-
-            var LoadedData = ProcessOriginalFiles(FilePath);
-
-            if (LoadedData != null)
-            {
-                UnloadMainGrid(); // Очищаем таблицу.
-
-                RefreshMainGrid(LoadedData);
-
-                SetTranslateCountLabel();
-
-                return true;
-            }
-            return false;
-        }
-
         private static object? GetDataGridCellValue(DataGridCellInfo CellInfo)
         {
             var Binding = new Binding();
@@ -738,31 +782,6 @@ namespace ModTranslator
             return false;
         }
 
-        private bool LoadFileBoxItemByIndex(int SelectedIndex)
-        {
-            if (SelectedIndex <= SelectFilesBox.Items.Count)
-            {
-                //SelectFilesBox.SelectedIndex = SelectedIndex;
-
-                string? SelectedCategory = SelectFilesBox.Items[SelectedIndex].ToString();
-
-                if (!string.IsNullOrEmpty(SelectedCategory) && Directory.Exists(g_ModFolderPath))
-                {
-                    string FilePath = g_ModFolderPath + "\\" + g_BindingsFileNames[SelectedCategory].OriginalFile;
-
-                    if (ProcessAndLoadOriginalFiles(FilePath))
-                    {
-                        g_CurrentOriginalFile = FilePath;
-
-                        SetTranslateCountLabel();
-
-                        return true;
-                    }
-                }
-            }
-            return false;
-        }
-
         /// <summary>
         /// 
         /// </summary>
@@ -773,17 +792,19 @@ namespace ModTranslator
         {
             var Result = new TextImportInfo { SuccessLoaded = 0 };
 
-            var TranslateData = ReadModTextCsvFile(FilePath, g_CsvFileSeparators, 3);
+            var TranslateData = ReadModTextCsvFile(FilePath, Settings.CsvSeparators, 3);
 
             if (TranslateData.Count >= 1)
             {
+                var MainRows = GetMainRows();
+
                 foreach (ModTextRow Data in TranslateData)
                 {
                     if (Parser.IsDummyRow(Data)) // Не импортируем "противобаговую" строку.
                         continue;
 
                     // Чувствителен к регистру.
-                    var DataIndex = g_CurrentMainGridData.FindIndex(0, g_CurrentMainGridData.Count, Item => string.Equals(Item.RowId, Data.RowId, StringComparison.Ordinal)); // Ищем совпадения по Id
+                    var DataIndex = MainRows.FindIndex(0, MainRows.Count, Item => string.Equals(Item.RowId, Data.RowId, StringComparison.Ordinal)); // Ищем совпадения по Id
 
                     // Не чуствителен
                     //var DataIndex = g_CurrentMainGridData.FindIndex(0, g_CurrentMainGridData.Count, Item => string.Equals(Item.RowId, Data.RowId, StringComparison.OrdinalIgnoreCase));
@@ -792,16 +813,16 @@ namespace ModTranslator
                     {
                         if (LoadInEmpty) // Загрузка только в пустые
                         {
-                            if (string.IsNullOrEmpty(g_CurrentMainGridData[DataIndex].TranslatedText))
+                            if (string.IsNullOrEmpty(MainRows[DataIndex].TranslatedText))
                             {
-                                g_CurrentMainGridData[DataIndex].TranslatedText = Data.TranslatedText;
+                                MainRows[DataIndex].TranslatedText = Data.TranslatedText;
 
                                 Result.SuccessLoaded++;
                             }
                         }
                         else
                         {
-                            g_CurrentMainGridData[DataIndex].TranslatedText = Data.TranslatedText;
+                            MainRows[DataIndex].TranslatedText = Data.TranslatedText;
 
                             Result.SuccessLoaded++;
                         }
@@ -809,7 +830,7 @@ namespace ModTranslator
                     else
                         Result.FailedLoad.Add(Data); // В файле-переводе и оригинале нет совпадения ID. (Вероятно, импортируемый файл может быть старой версией перевода)
                 }
-                RefreshMainGrid(g_CurrentMainGridData);
+                RefreshMainGrid(MainRows);
             }
             return Result;
         }
@@ -877,7 +898,7 @@ namespace ModTranslator
             if (string.IsNullOrEmpty(Input))
                 return Input;
 
-            return new string(Input.Select(c => g_TextForbiddenChars.GetValueOrDefault(c, c)).ToArray());
+            return new string(Input.Select(c => Settings.ForbiddenChars.GetValueOrDefault(c, c)).ToArray());
         }
 
         private void ExportModTextToFile(string FilePath, bool EmptyExport)
@@ -886,7 +907,9 @@ namespace ModTranslator
 
             using (StreamWriter WriteText = new StreamWriter(FilePath))
             {
-                foreach (var TextData in g_CurrentMainGridData)
+                var MainRows = GetMainRows();
+
+                foreach (var TextData in MainRows)
                 {
                     if (WriteDummy == false)
                     {
@@ -924,18 +947,21 @@ namespace ModTranslator
 
         private string GetTranslateFileNameFromFileBox()
         {
-            string? FileName = SelectFilesBox.SelectedValue.ToString();
+            var SelectedCategory = SelectFilesBox.SelectedValue.ToString();
 
-            if (FileName != null)
+            if (!string.IsNullOrEmpty(SelectedCategory))
             {
-                string Result = g_BindingsFileNames[FileName].CsvFile;
+                var LoadedFile = WorkLoad.FindByCategory(SelectedCategory);
 
-                if (string.IsNullOrEmpty(Result))
-                    return "translate.csv"; //
-                else
-                    return Result;
+                if (LoadedFile != null)
+                {
+                    var ExportName = LoadedFile.ExportName;
+
+                    if (!string.IsNullOrEmpty(ExportName))
+                        return ExportName;
+                }
             }
-            return string.Empty;
+            return "translate.csv";
         }
 
         private void ExportFileDialog(string SaveTo = "")
@@ -980,24 +1006,6 @@ namespace ModTranslator
             }
         }
 
-        private void DataGridCellBegining(object? sender, DataGridBeginningEditEventArgs e)
-        {
-            if (e.Column.Header.ToString() == "ID")
-            {
-                //
-            }
-
-            if (e.Column.Header.ToString() == "Оригинал")
-            {
-                //
-            }
-
-            if (e.Column.Header.ToString() == "Перевод")
-            {
-                g_CurrentCellValue = GetCellStringValue(sender);
-            }
-        }
-
         private void DataGridSelectedCellsChanged(object sender, SelectedCellsChangedEventArgs e)
         {
             foreach (DataGridCellInfo CellInfo in e.AddedCells)
@@ -1017,19 +1025,47 @@ namespace ModTranslator
             }
         }
 
+        private void DataGridCellBegining(object? sender, DataGridBeginningEditEventArgs e)
+        {
+            if (e.Column.DisplayIndex == 0) // №
+            {
+                //
+            }
+
+            if (e.Column.DisplayIndex == 1) // ID
+            {
+                //
+            }
+
+            if (e.Column.DisplayIndex == 2) // Оригинал
+            {
+                //
+            }
+
+            if (e.Column.DisplayIndex == 3) // Перевод
+            {
+                g_CurrentCellValue = GetCellStringValue(sender);
+            }
+        }
+
         private void DataGridCellEditEnding(object? sender, DataGridCellEditEndingEventArgs e)
         {
-            if (e.Column.Header.ToString() == "ID")
+            if (e.Column.DisplayIndex == 0) // №
             {
                 //
             }
 
-            if (e.Column.Header.ToString() == "Оригинал")
+            if (e.Column.DisplayIndex == 1) // ID
             {
                 //
             }
 
-            if (e.Column.Header.ToString() == "Перевод")
+            if (e.Column.DisplayIndex == 2) // Оригинал
+            {
+                //
+            }
+
+            if (e.Column.DisplayIndex == 3) // Перевод
             {
                 if (e.EditAction == DataGridEditAction.Commit)
                 {
@@ -1168,63 +1204,116 @@ namespace ModTranslator
             return (-1, -1);
         }
 
-        // Fixme: Вызывает срабатывание SelectFilesBox_SelectionChanged
-        private int LoadOriginalFilesToFileBox(string FolderPath)
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="ModFolderPath"></param>
+        /// <returns></returns>
+        private int LoadModFilesAndCategories(string ModFolderPath)
         {
-            var Result = 0;
+            var LoadCount = -1;
 
-            var NewFilesList = new List<string> { };
+            var CategoryList = new List<string> { };
 
-            for (int i = 0; i < g_BindingsFileNames.Count; i++)
+            foreach (var ModFile in WorkLoad.GetBindings())
             {
-                var FileNames = g_BindingsFileNames.Values.ElementAt(i);
+                string FullPath = Path.Combine(ModFolderPath, ModFile.FileName);
 
-                var TitleName = g_BindingsFileNames.Keys.ElementAt(i);
-
-                var OrginalFilePath = FolderPath + "\\" + FileNames.OriginalFile;
-
-                if (File.Exists(OrginalFilePath))
+                if (File.Exists(FullPath))
                 {
-                    Result++;
+                    var LoadedFile = ProcessOriginalFiles(FullPath);
 
-                    NewFilesList.Add(TitleName);
+                    if (LoadedFile == null)
+                    {
+                        var Ask = MessageBox.Show($"При загрузке {FullPath} произшла ошибка. Продолжить загрузку?", "Ошибка загрузки", MessageBoxButton.YesNo, MessageBoxImage.Error);
+
+                        if (Ask == MessageBoxResult.Yes)
+                            continue;
+
+                        return -1;
+                    }
+                    LoadCount++;
+
+                    ModFile.Rows = LoadedFile;
+
+                    CategoryList.Add(ModFile.Category);
                 }
             }
-            if (Result > 0)
+            if (LoadCount >= 0)
             {
-                SelectFilesBox.ItemsSource = NewFilesList; // Херня вызывает срабатывание SelectFilesBox_SelectionChanged как итог файл может грузиться более 1 раза.
+                SelectFilesBox.SelectedIndex = 0;
 
-                SelectFilesBox.SelectedIndex = 0; // Начинаем список с 1 позиции. Не трогать.
+                SelectFilesBox.ItemsSource = CategoryList;
 
                 SelectFilesBox.Items.Refresh();
             }
-            return Result;
+            return LoadCount;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="FilePath"></param>
+        /// <returns></returns>
+        public bool ProcessAndLoadSingleFile(string FilePath)
+        {
+            if (!File.Exists(FilePath))
+                return false;
+
+            var LoadedData = ProcessOriginalFiles(FilePath);
+
+            if (LoadedData != null)
+            {
+                RefreshMainGridAndSetCount(LoadedData);
+
+                return true;
+            }
+            return false;
+        }
+
+        private bool LoadCategoryFromFileBox(int CategoryIndex)
+        {
+            var SelectedCategory = SelectFilesBox.SelectedValue?.ToString();
+
+            if (!string.IsNullOrEmpty(SelectedCategory))
+            {
+                var LoadedFile = WorkLoad.FindByCategory(SelectedCategory);
+
+                if (LoadedFile == null || LoadedFile.Rows == null)
+                {
+                    MessageBox.Show($"Не удалось загрузить {SelectedCategory}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+
+                    return false;
+                }
+                RefreshMainGridAndSetCount(LoadedFile.Rows);
+
+                return true;
+            }
+            return false;
         }
 
         private void SelectFilesBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            DataTextChangedMessage();
+            //DataTextChangedMessage();
 
             g_CompareMode = false;
 
-            var SelectedCategory = SelectFilesBox.SelectedValue.ToString();
+            var SelectedCategory = SelectFilesBox.SelectedValue?.ToString();
 
-            if (!string.IsNullOrEmpty(SelectedCategory) && Directory.Exists(g_ModFolderPath))
+            if (string.IsNullOrEmpty(SelectedCategory))
+                return;
+
+            var LoadedFile = WorkLoad.FindByCategory(SelectedCategory);
+
+            if (LoadedFile != null)
             {
-                string FilePath = g_ModFolderPath + "\\" + g_BindingsFileNames[SelectedCategory].OriginalFile;
+                g_FileForExport = Path.Combine(g_ModFolderPath + "\\languages\\" + LoadedFile.ExportName);
 
-                g_FileForExport = g_ModFolderPath + "\\languages\\"+ g_BindingsFileNames[SelectedCategory].CsvFile;
-
-                if (File.Exists(g_CurrentOriginalFile) && !string.Equals(g_CurrentOriginalFile, FilePath))
+                if (LoadedFile.Rows != null)
                 {
-                    if (ProcessAndLoadOriginalFiles(FilePath))
-                    {
-                        EnableControlButtons();
+                    g_CurrentOriginalFile = Path.Combine(g_ModFolderPath, LoadedFile.FileName);
 
-                        SetTranslateCountLabel();
-
-                        g_CurrentOriginalFile = FilePath;
-                    }
+                    RefreshMainGridAndSetCount(LoadedFile.Rows);
                 }
             }
             ActionAfterSelectionChanged();
@@ -1236,10 +1325,15 @@ namespace ModTranslator
 
             if (!string.IsNullOrEmpty(SelectedCategory))
             {
-                if (string.Equals(g_BindingsFileNames[SelectedCategory].OriginalFile, "menus.txt"))
-                    g_OptionsWindow.FixMenus.IsEnabled = true;
-                else
-                    g_OptionsWindow.FixMenus.IsEnabled = false;
+                var LoadedFile = WorkLoad.FindByCategory(SelectedCategory);
+
+                if (LoadedFile != null)
+                {
+                    if (string.Equals(LoadedFile.FileName, "menus.txt"))
+                        g_OptionsWindow.FixMenus.IsEnabled = true;
+                    else
+                        g_OptionsWindow.FixMenus.IsEnabled = false;
+                }
             }
         }
 
@@ -1255,29 +1349,33 @@ namespace ModTranslator
 
             if (FolderDialog.ShowDialog() == true)
             {
-                SelectFilesBox.IsEnabled = true;
+                g_FileForExport  = string.Empty;
 
-                g_FileForExport = string.Empty;
+                g_ModFolderPath  = FolderDialog.FolderName;
 
-                g_ModFolderPath = FolderDialog.FolderName;
-
-                if (LoadOriginalFilesToFileBox(FolderDialog.FolderName) > 0) // Fixme: Вызывает срабатывание SelectFilesBox_SelectionChanged
+                if (LoadModFilesAndCategories(FolderDialog.FolderName) == -1)
                 {
-                    if (LoadFileBoxItemByIndex(0)) // Грузим 1 категорию.
-                    {
-                        ModPathText.Text = FolderDialog.FolderName;
-
-                        EnableControlButtons();
-                    }
-                }
-                else
                     MessageBox.Show("Неверный мод.", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+
+                    return;
+                }
+
+                if (!LoadCategoryFromFileBox(0))
+                {
+                    MessageBox.Show("Ошибка загрузки категории.", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+
+                    return;
+                }
+
+                ModPathText.Text = FolderDialog.FolderName;
+
+                EnableControlButtons();
             }
         }
 
         private void SaveButton_Click(object sender, RoutedEventArgs e)
         {
-            if (!IsLoadedTextData())
+            if (!IsLoadDataGrid())
                 return;
 
             ExportFileDialog();
@@ -1285,7 +1383,7 @@ namespace ModTranslator
 
         private void ImportButton_Click(object sender, RoutedEventArgs e)
         {
-            if (!IsLoadedTextData())
+            if (!IsLoadDataGrid())
                 return;
 
             if (g_OptionsWindow == null)
@@ -1333,26 +1431,27 @@ namespace ModTranslator
         {
             if (e.Key == Key.Enter) // Ввод
             {
-                if (Directory.Exists(ModPathText.Text))
+                e.Handled = true;
+
+                if (!Directory.Exists(ModPathText.Text))
+                {
+                    MessageBox.Show("Неверный путь.", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+
+                    return;
+                }
+                else
                 {
                     DataTextChangedMessage();
 
-                    if (LoadOriginalFilesToFileBox(ModPathText.Text) > 0)
+                    if (LoadModFilesAndCategories(ModPathText.Text) >= 0)
                     {
                         g_ModFolderPath = ModPathText.Text;
 
                         SelectFilesBox.IsEnabled = true;
 
-                        if (LoadFileBoxItemByIndex(0))
-                        {
-                            EnableControlButtons();
-                        }
+                        EnableControlButtons();
                     }
                 }
-                else
-                    MessageBox.Show("Неверный путь.", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
-
-                e.Handled = true;
             }
         }
 
@@ -1362,7 +1461,7 @@ namespace ModTranslator
             {
                 g_DataHasBeenChanged = false;
 
-                if (IsLoadedTextData())
+                if (IsLoadDataGrid())
                 {
                     ExportFileDialog();
                 }
@@ -1401,12 +1500,17 @@ namespace ModTranslator
                 {
                     g_CompareMode = false;
 
-                    ProcessAndLoadOriginalFiles(g_CurrentOriginalFile);
+                    if (!LoadCategoryFromFileBox(SelectFilesBox.SelectedIndex))
+                    {
+                        //
+                    }
                 }
                 else
                 {
                     if (ChooseModAndSeeDifference())
+                    {
                         g_CompareMode = true;
+                    }
                 }
                 e.Handled = true;
             }
@@ -1414,7 +1518,7 @@ namespace ModTranslator
 
         private bool ChooseModAndSeeDifference()
         {
-            if (!IsLoadedTextData())
+            if (!IsLoadDataGrid())
                 return false;
 
             var FolderDialog = new OpenFolderDialog();
@@ -1446,18 +1550,14 @@ namespace ModTranslator
                     return false;
                 }
 
-                var ModChanges = Parser.GetModTextChanges(g_CurrentMainGridData, LoadedData);
+                var ModChanges = Parser.GetModTextChanges(GetMainRows(), LoadedData);
 
                 if (ModChanges.Count == 0)
                 {
                     MessageBox.Show($"Разницы нет", "Сравнение", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
 
-                UnloadMainGrid();
-
-                RefreshMainGrid(ModChanges);
-
-                SetTranslateCountLabel();
+                RefreshMainGridAndSetCount(ModChanges);
 
                 if (ModChanges.Count > 0)
                 {
@@ -1539,7 +1639,7 @@ namespace ModTranslator
         /// <returns></returns>
         private int NextFocusCell(DataGrid TableGrid, string ColumnName, bool Cycle = false)
         {
-            if (!IsLoadedTextData())
+            if (!IsLoadDataGrid())
                 return -1;
 
             int ColumnIndex = GetColumnIndexByName(TableGrid, ColumnName);
@@ -1583,7 +1683,7 @@ namespace ModTranslator
 
         private int PrevFocusCell(DataGrid TableGrid, string ColumnName, bool Cycle = false)
         {
-            if (!IsLoadedTextData())
+            if (!IsLoadDataGrid())
                 return -1;
 
             var ColumnIndex = GetColumnIndexByName(TableGrid, ColumnName);
@@ -1821,7 +1921,7 @@ namespace ModTranslator
 
         private void DataGridContextMenuOpening(object sender, ContextMenuEventArgs e)
         {
-            if (!IsLoadedTextData()) // Не показываем меню, если не знагружена таблица.
+            if (!IsLoadDataGrid()) // Не показываем меню, если не знагружена таблица.
             {
                 e.Handled = true;
 
@@ -1874,15 +1974,15 @@ namespace ModTranslator
                         if (ModText.NPC.IsWoman)
                         {
                             if (ShowNpc)
-                                RowData.Background = FemalesColor;
+                                RowData.Background = Settings.FemalesColor;
                         }
                         else if (ModText.NPC.IsOther)
                         {
                             if (ShowNpc)
-                                RowData.Background = UnknownsColor;
+                                RowData.Background = Settings.UnknownsColor;
                         }
                         else 
-                            RowData.Background = DefaultRowColor;
+                            RowData.Background = Settings.DefaultRowColor;
                     }
                 }
             }

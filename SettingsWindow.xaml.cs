@@ -17,7 +17,7 @@ namespace ModTranslatorSettings
         /// <summary>
         /// Главное окно.
         /// </summary>
-        private MainTranslatorWindow g_MainWindow;
+        private MainTranslatorWindow MainWindow;
 
         private bool g_HideWindow = true;
 
@@ -40,7 +40,7 @@ namespace ModTranslatorSettings
 
             InitSettingsWindow();
 
-            g_MainWindow = Window;
+            MainWindow = Window;
 
             Parser.g_DeleteDublicatesIDs = !this.ShowDubsID.IsChecked ?? true;
 
@@ -68,101 +68,101 @@ namespace ModTranslatorSettings
 
         private void ShowID_Checked(object sender, RoutedEventArgs e)
         {
-            if (g_MainWindow != null)
+            if (MainWindow != null)
             {
-                g_MainWindow.SetColumnVisibility("ID", Visibility.Visible);
+                MainWindow.SetColumnVisibility("ID", Visibility.Visible);
             }
         }
 
         private void ShowID_Unchecked(object sender, RoutedEventArgs e)
         {
-            if (g_MainWindow != null)
+            if (MainWindow != null)
             {
-                g_MainWindow.SetColumnVisibility("ID", Visibility.Collapsed);
+                MainWindow.SetColumnVisibility("ID", Visibility.Collapsed);
             }
         }
 
         private void ShowDubsID_Checked(object sender, RoutedEventArgs e)
         {
-            if (g_MainWindow != null)
+            if (MainWindow != null)
             {
                 Parser.g_DeleteDublicatesIDs = false;
 
-                if (g_MainWindow.IsLoadedTextData())
+                if (MainWindow.IsLoadDataGrid())
                 {
-                    g_MainWindow.RefreshMainGridAndSetCount();
+                    MainWindow.RefreshMainGridAndSetCount();
                 }
             }
         }
 
         private void ShowDubsID_Unchecked(object sender, RoutedEventArgs e)
         {
-            if (g_MainWindow != null)
+            if (MainWindow != null)
             {
                 Parser.g_DeleteDublicatesIDs = true;
 
-                if (g_MainWindow.IsLoadedTextData())
+                if (MainWindow.IsLoadDataGrid())
                 {
-                    g_MainWindow.RefreshMainGridAndSetCount();
+                    MainWindow.RefreshMainGridAndSetCount();
                 }
             }
         }
 
         private void ShowBlocksymbols_Checked(object sender, RoutedEventArgs e)
         {
-            if (g_MainWindow != null)
+            if (MainWindow != null)
             {
                 Parser.g_IgnoreBlockingSymbol = true;
 
-                if (g_MainWindow.IsLoadedTextData())
+                if (MainWindow.IsLoadDataGrid())
                 {
-                    g_MainWindow.RefreshMainGridAndSetCount();
+                    MainWindow.RefreshMainGridAndSetCount();
                 }
             }
         }
 
         private void ShowBlocksymbols_Unchecked(object sender, RoutedEventArgs e)
         {
-            if (g_MainWindow != null)
+            if (MainWindow != null)
             {
                 Parser.g_IgnoreBlockingSymbol = false;
 
-                if (g_MainWindow.IsLoadedTextData())
+                if (MainWindow.IsLoadDataGrid())
                 {
-                    g_MainWindow.RefreshMainGridAndSetCount();
+                    MainWindow.RefreshMainGridAndSetCount();
                 }
             }
         }
 
         private void ShowFemales_Checked(object sender, RoutedEventArgs e)
         {
-            if (g_MainWindow != null)
+            if (MainWindow != null)
             {
-                if (g_MainWindow.IsLoadedTextData())
+                if (MainWindow.IsLoadDataGrid())
                 {
-                    g_MainWindow.MainDataGrid.Items.Refresh();
+                    MainWindow.MainDataGrid.Items.Refresh();
                 }
             }
         }
 
         private void ShowFemales_Unchecked(object sender, RoutedEventArgs e)
         {
-            if (g_MainWindow != null)
+            if (MainWindow != null)
             {
-                if (g_MainWindow.IsLoadedTextData())
+                if (MainWindow.IsLoadDataGrid())
                 {
-                    g_MainWindow.MainDataGrid.Items.Refresh();
+                    MainWindow.MainDataGrid.Items.Refresh();
                 }
             }
         }
 
         private void FixMenus_Click(object sender, RoutedEventArgs e)
         {
-            if (g_MainWindow != null)
+            if (MainWindow != null)
             {
-                g_MainWindow.DataTextChangedMessage();
+                MainWindow.DataTextChangedMessage();
 
-                FixMenusDialog(g_MainWindow.g_CurrentOriginalFile);
+                FixMenusDialog(MainWindow.g_CurrentOriginalFile);
             }
         }
 
@@ -212,7 +212,7 @@ namespace ModTranslatorSettings
 
                 if (Answer == MessageBoxResult.Yes)
                 {
-                    g_MainWindow.DataTextChangedMessage();
+                    MainWindow.DataTextChangedMessage();
 
                     File.Copy(MenuFilePath, BackupFullPath, RewriteBackup);
 
@@ -220,7 +220,7 @@ namespace ModTranslatorSettings
 
                     File.WriteAllText(MenuFilePath, NewMenuText);
 
-                    g_MainWindow.ProcessAndLoadOriginalFiles(MenuFilePath);
+                    MainWindow.ProcessAndLoadSingleFile(MenuFilePath);
                 }
             }
             return false;

@@ -5,6 +5,9 @@
  *  
  *  1) Если строка, например, в меню будет состоять только из чисел, то парсер не сможет их найти, т.к нет пока возможности отделить флаги от текста.
  */
+
+#define USE_OLDPARSE
+
 using System.Globalization;
 using System.IO;
 using System.Text;
@@ -280,6 +283,94 @@ namespace WarbandParser
             return string.Empty;
         }
 
+#if USE_OLDPARSE
+        private static bool IsWordCharacter(char c)
+        {
+            return char.IsLetterOrDigit(c) || c == '_';
+        }
+
+        private static int GetPrefixEnter(string TextData, int StartPos, string Prefix)
+        {
+            if (string.IsNullOrEmpty(TextData) || StartPos < 0 || string.IsNullOrEmpty(Prefix))
+                return -1;
+
+            int CurrentPos = StartPos;
+
+            while (CurrentPos < TextData.Length) // Пока позиция в строке меньше, чем её длина.
+            {
+                int EnterPos = TextData.IndexOf(Prefix, CurrentPos, StringComparison.Ordinal); // Ищем вхождение префикса
+
+                if (EnterPos == 0) // Если нашли префикс в самом начале, то
+                    return EnterPos; // выходим с результатом.
+
+                if (EnterPos == -1) // Если ничего не нашли, то
+                    return -1; // просто выходим с ошибкой.
+
+                if (!IsWordCharacter(TextData[EnterPos - 1])) // Проверяем предыдущий символ от найденного префикса на наличие символов. Если не пустой, то это ложный префикс.
+                    return EnterPos; // Если пусто, то всё хорошо
+
+                CurrentPos = EnterPos + Prefix.Length; // Текущая позиция = индекс найденного префикса + длина префикса
+            }
+            return -1;
+        }
+
+        private static List<ParseArg> ParseTextData(string TextData, string Prefix)
+        {
+            var Result = new List<ParseArg> { };
+
+            if (string.IsNullOrEmpty(TextData) || string.IsNullOrEmpty(Prefix))
+                return Result;
+
+            if (TextData.Length > 0)
+            {
+                int CurrentPosition = 0; // Текущая позиция в TextData
+
+                while (CurrentPosition < TextData.Length)
+                {
+                    int EnterPos = GetPrefixEnter(TextData, CurrentPosition, Prefix); // Первое вхождения префикса
+
+                    if (EnterPos == -1)
+                        break;
+
+                    int EndPos = GetPrefixEnter(TextData, EnterPos + Prefix.Length, Prefix); // Ищем начало второго вхождения.
+
+                    if (EndPos == -1) // Если его нет, но есть первое, то
+                        EndPos = TextData.Length; // мы в конце данных.
+
+                    var ResultString = TextData.Substring(EnterPos, EndPos - EnterPos).Trim(); // Извлекаем строку и удалем пробелы.
+
+                    if (ResultString != string.Empty)
+                    {
+                        if (IsLineStartsWithPrefix(ResultString))
+                        {
+                            Result.Add(
+                                new ParseArg(
+                                    ResultString, //
+                                    EnterPos,     //
+                                    EndPos        //
+                                ));
+                        }
+                    }
+                    CurrentPosition = EndPos;
+                }
+            }
+            return Result;
+        }
+        private static List<ParseArg> LoadAndParseFile(string FilePath, string Prefix)
+        {
+            var Result = new List<ParseArg>();
+
+            if (File.Exists(FilePath) && !string.IsNullOrEmpty(Prefix))
+            {
+                string TextData = EncodingText.ReadTextFileAndConvertTo(FilePath, Encoding.Unicode);
+
+                if (TextData.Length > 0)
+                    Result = ParseTextData(TextData, Prefix);
+            }
+            return Result;
+        }
+#else
+        //Нужно тестить много.
         private static List<ParseArg> ParseTextData(string TextData, string[] Prefixes)
         {
             var Result = new List<ParseArg>();
@@ -289,7 +380,7 @@ namespace WarbandParser
 
             var RegPrefixes = Prefixes.Select(p => $"{p}\\w+");
 
-            string Pattern = $@"(?:^|\W)({string.Join("|", RegPrefixes)})(?=$|\W)";
+            string Pattern = $@"(?<!\B)(?:{string.Join("|", RegPrefixes)})\w+\b";
 
             var PrefixesMatches = Regex.Matches(TextData, Pattern);
 
@@ -349,6 +440,7 @@ namespace WarbandParser
         {
             return LoadAndParseFile(FilePath, [Prefix]);
         }
+#endif
 
         /// <summary>
         /// 
@@ -524,7 +616,7 @@ namespace WarbandParser
             if (!File.Exists(FilePath))
                 return Result;
 
-            var Dialogs = LoadAndParseFile(FilePath, ["dlga_"]);
+            var Dialogs = LoadAndParseFile(FilePath, "dlga_");
 
             if (Dialogs.Count > 0)
             {
@@ -1247,7 +1339,7 @@ namespace WarbandParser
             if (!File.Exists(FilePath))
                 return Result;
 
-            var Troops = LoadAndParseFile(FilePath, ["trp_"]);
+            var Troops = LoadAndParseFile(FilePath, "trp_");
 
             if (Troops.Count() > 0)
             {
