@@ -18,7 +18,7 @@
 
         <Button x:Name="OpenModButton" Content="Откр. мод" Margin="486,37,0,0" VerticalAlignment="Top" Height="25" Grid.Column="1" HorizontalAlignment="Left" Width="67" Click="OpenModButton_Click"/>
 
-        <ComboBox x:Name="SelectFilesBox" ToolTip="Список игровых категорий" Margin="568,37,0,0" VerticalAlignment="Top" Height="25" IsEnabled="False" SelectedIndex="0" Grid.Column="1" Grid.ColumnSpan="2" HorizontalAlignment="Left" Width="180" SelectionChanged="SelectFilesBox_SelectionChanged"/>
+        <ComboBox x:Name="SelectFilesBox" ToolTip="Список игровых категорий" Margin="570,37,0,0" VerticalAlignment="Top" Height="25" IsEnabled="False" SelectedIndex="0" Grid.Column="1" HorizontalAlignment="Left" Width="180" SelectionChanged="SelectFilesBox_SelectionChanged" Grid.ColumnSpan="2"/>
 
         <DataGrid x:Name="MainDataGrid" 
                   Margin="15,121,15,15" 
@@ -81,17 +81,17 @@
                             <Setter Property="IsReadOnly" Value="True"/>
                         </Style>
                     </DataGridTextColumn.EditingElementStyle>
-                    
+
                 </DataGridTextColumn>
 
                 <DataGridTextColumn Header="Оригинал" Binding="{Binding OriginalText}"  Width="*" IsReadOnly="False" CanUserSort="False" CanUserReorder="False" FontSize="14" CanUserResize="True">
-                    
+
                     <DataGridTextColumn.ElementStyle>
                         <Style>
                             <Setter Property="TextBlock.TextWrapping" Value="Wrap"/>
                         </Style>
                     </DataGridTextColumn.ElementStyle>
-                    
+
                     <DataGridTextColumn.EditingElementStyle>
                         <Style TargetType="{x:Type TextBox}">
                             <Setter Property="TextWrapping" Value="Wrap"/>
@@ -99,24 +99,24 @@
                             <Setter Property="IsReadOnly" Value="True"/>
                         </Style>
                     </DataGridTextColumn.EditingElementStyle>
-                    
+
                 </DataGridTextColumn>
 
                 <DataGridTextColumn Header="Перевод" Binding="{Binding TranslatedText}" Width="*" IsReadOnly="False" CanUserSort="False" CanUserReorder="False" FontSize="14" CanUserResize="True">
-                    
+
                     <DataGridTextColumn.ElementStyle>
                         <Style>
                             <Setter Property="TextBlock.TextWrapping" Value="Wrap"/>
                         </Style>
                     </DataGridTextColumn.ElementStyle>
-                    
+
                     <DataGridTextColumn.EditingElementStyle>
                         <Style TargetType="{x:Type TextBox}">
                             <Setter Property="TextWrapping" Value="Wrap"/>
                             <Setter Property="AcceptsReturn" Value="True"/>
                         </Style>
                     </DataGridTextColumn.EditingElementStyle>
-                    
+
                 </DataGridTextColumn>
 
             </DataGrid.Columns>
@@ -126,20 +126,20 @@
 
         <Button x:Name="ImportButton" Grid.Column="2" Content="Импорт перевода" Margin="0,37,151,0" VerticalAlignment="Top" Height="31" HorizontalAlignment="Right" Width="110" IsEnabled="False" Click="ImportButton_Click"/>
 
-        <Label x:Name="TranslateCount" Content="Всего: 0 | Cкрыто: 0 | Переведено: 0" ToolTip="Скрытые строки могут быть переведены." HorizontalAlignment="Left" Margin="105,81,0,0" VerticalAlignment="Top" Width="350" FontSize="11" Height="25" Grid.Column="1"/>
+        <Label x:Name="TranslateCount" Content="Всего: 0 | Cкрыто: 0 | Переведено: 0" ToolTip="Скрытые строки могут быть переведены." HorizontalAlignment="Left" Margin="105,81,0,0" VerticalAlignment="Top" Width="366" FontSize="11" Height="25" Grid.Column="1"/>
 
         <Button x:Name="NextCellButton" Content="След." ToolTip="Перейти к следующей непереведённой строке" HorizontalAlignment="Left" Margin="55,81,0,0" VerticalAlignment="Top" Height="25" Width="40" Grid.Column="1" IsEnabled="False" Click="NextCellButton_Click"/>
 
         <Button x:Name="PrevCellButton" Content="Пред." ToolTip="Перейти к предыдущей непереведённой строке"  HorizontalAlignment="Left" Margin="0,81,0,0" VerticalAlignment="Top" Width="40" Height="25" Grid.Column="1" IsEnabled="False" Click="PrevCellButton_Click"/>
 
         <Menu x:Name="MainMenu" Grid.ColumnSpan="3" Height="20" VerticalAlignment="Top" Background="{Binding ElementName=grid, Mode=OneWay}">
-            
+
             <MenuItem x:Name="SettingsMenu" Margin="10,0,0,0" Header="Настройки" HorizontalAlignment="Left" VerticalAlignment="Top" Click="SettingsMenu_Click"/>
 
             <MenuItem x:Name="SearchMenu" Header="Поиск" ToolTip="Ctrl + F"  Click="SearchMenu_Click"/>
-            
+
             <MenuItem x:Name="AboutMenu" Header="?" Click="AboutMenu_Click"/>
-            
+
         </Menu>
 
     </Grid>

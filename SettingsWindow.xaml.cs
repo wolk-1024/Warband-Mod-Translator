@@ -160,7 +160,10 @@ namespace ModTranslatorSettings
         {
             if (MainWindow != null)
             {
-                MainWindow.DataTextChangedMessage();
+                if (MainWindow.AskIfCatIsChanged("Всё равно продолжить?", "Продолжить?", MessageBoxImage.Question) == 0)
+                    return;
+
+                MainWindow.CatIsChanged(false);
 
                 FixMenusDialog(MainWindow.g_CurrentOriginalFile);
             }
@@ -212,8 +215,6 @@ namespace ModTranslatorSettings
 
                 if (Answer == MessageBoxResult.Yes)
                 {
-                    MainWindow.DataTextChangedMessage();
-
                     File.Copy(MenuFilePath, BackupFullPath, RewriteBackup);
 
                     File.Delete(MenuFilePath);

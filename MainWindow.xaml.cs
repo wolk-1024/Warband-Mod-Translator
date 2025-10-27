@@ -34,6 +34,14 @@ namespace ModTranslator
 {
     public partial class MainTranslatorWindow : Window
     {
+        enum ColumnIndex
+        {
+            Number = 0,
+            ID = 1,
+            Original = 2,
+            Translated = 3
+        }
+
         public static class Settings
         {
             public static string AppTitle = "Warband Mod Translator v1.0b";
@@ -75,12 +83,11 @@ namespace ModTranslator
         {
             public class ModInfo
             {
-                public bool IsChanged    { get; set; } = true;
-
                 public string FileName   { get; set; } = string.Empty;
                 public string ExportName { get; set; } = string.Empty;
                 public string Category   { get; set; } = string.Empty;
 
+                public bool IsChanged { get; set; } = false;
                 public List<ModTextRow>? Rows { get; set; } = null;
             }
             /// <summary>
@@ -119,16 +126,16 @@ namespace ModTranslator
                 return BindingsList.Where(x => x.IsChanged).Select(x => x.Category).ToList();
             }
 
+            public static List<ModInfo> GetChangedModInfo()
+            {
+                return BindingsList.Where(x => x.IsChanged).ToList();
+            }
+
             public static List<ModInfo> GetBindings() 
             {
                 return BindingsList; 
             }
         }
-
-        /// <summary>
-        /// Станет true, если ячейка перевода будет изменена.
-        /// </summary>
-        public bool g_DataHasBeenChanged = false;
 
         /// <summary>
         /// Путь к моду.
@@ -203,17 +210,13 @@ namespace ModTranslator
 
         private void MainWindowClosing(object? sender, CancelEventArgs e)
         {
-            var ListName = WorkLoad.GetChangedCategories();
-
-            if (ListName.Count > 0 && IsLoadDataGrid())
+            if (IsLoadDataGrid())
             {
-                string Categories = string.Join(", ", ListName);
-
-                var Result = AskIfModDataChanged("Выйти без их сохранения?", "Подтверждение", MessageBoxImage.Warning);
+                var Result = AskIfAllCatsChanged("Выйти без их сохранения?", "Подтверждение", MessageBoxImage.Question);
 
                 if (Result == 1)
                     e.Cancel = false;
-                else
+                else if (Result == 0)
                 {
                     e.Cancel = true;
 
@@ -228,11 +231,11 @@ namespace ModTranslator
         /// <summary>
         /// -1 данные не изменены. 1 - да. 0 - нет.
         /// </summary>
-        public int AskIfModDataChanged(string MessageIfChanged, string Caption, MessageBoxImage Image)
+        public int AskIfAllCatsChanged(string MessageIfChanged, string Caption, MessageBoxImage Image)
         {
             var ListName = WorkLoad.GetChangedCategories();
 
-            if (ListName.Count > 0 && IsLoadDataGrid())
+            if (ListName.Count > 0)
             {
                 string Categories = string.Join(", ", ListName);
 
@@ -246,17 +249,42 @@ namespace ModTranslator
             return -1;
         }
 
-        public void DataTextChangedMessage()
+        /// <summary>
+        /// -1 данные не изменены. 1 - да. 0 - нет.
+        /// </summary>
+        public int AskIfCatIsChanged(string MessageIfChanged, string Caption, MessageBoxImage Image)
         {
-            if (g_DataHasBeenChanged && IsLoadDataGrid())
+            var ModInfo = GetCurrentMod();
+
+            if (ModInfo != null && ModInfo.IsChanged)
             {
-                MessageBoxResult Message = MessageBox.Show("Данные не сохранены. Сохранить?", "Подтверждение", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+                MessageBoxResult Result = MessageBox.Show($"Данные были изменены в: {ModInfo.Category}\n\n{MessageIfChanged}", Caption, MessageBoxButton.YesNo, Image);
 
-                if (Message == MessageBoxResult.Yes)
-                    ExportFileDialog();
-
-                g_DataHasBeenChanged = false;
+                if (Result == MessageBoxResult.Yes)
+                    return 1;
+                else if (Result == MessageBoxResult.No)
+                    return 0;
             }
+            return -1;
+        }
+
+        ///<summary>Установить для всех категорий состояния</summary>
+        public void AllCatsIsChanged(bool Bool)
+        {
+            var List = WorkLoad.GetChangedModInfo();
+
+            if (List.Count > 0)
+                foreach (var Item in List) 
+                    Item.IsChanged = Bool;
+        }
+
+        ///<summary>Установить состояние только для текущей категории</summary>
+        public void CatIsChanged(bool Bool)
+        {
+            var CurrentMod = GetCurrentMod();
+
+            if (CurrentMod != null)
+                CurrentMod.IsChanged = Bool;
         }
 
         private void EnableControlButtons()
@@ -1000,7 +1028,7 @@ namespace ModTranslator
 
                 ExportModTextToFile(FileDialog.FileName, (bool)EmptyExport);
 
-                g_DataHasBeenChanged = false;
+                CatIsChanged(false);
 
                 g_FileForExport = FileDialog.FileName;
             }
@@ -1027,22 +1055,22 @@ namespace ModTranslator
 
         private void DataGridCellBegining(object? sender, DataGridBeginningEditEventArgs e)
         {
-            if (e.Column.DisplayIndex == 0) // №
+            if ((ColumnIndex)e.Column.DisplayIndex == ColumnIndex.Number) // №
             {
                 //
             }
 
-            if (e.Column.DisplayIndex == 1) // ID
+            if ((ColumnIndex)e.Column.DisplayIndex == ColumnIndex.ID) // ID
             {
                 //
             }
 
-            if (e.Column.DisplayIndex == 2) // Оригинал
+            if ((ColumnIndex)e.Column.DisplayIndex == ColumnIndex.Original) // Оригинал
             {
                 //
             }
 
-            if (e.Column.DisplayIndex == 3) // Перевод
+            if ((ColumnIndex)e.Column.DisplayIndex == ColumnIndex.Translated) // Перевод
             {
                 g_CurrentCellValue = GetCellStringValue(sender);
             }
@@ -1050,22 +1078,22 @@ namespace ModTranslator
 
         private void DataGridCellEditEnding(object? sender, DataGridCellEditEndingEventArgs e)
         {
-            if (e.Column.DisplayIndex == 0) // №
+            if ((ColumnIndex)e.Column.DisplayIndex == ColumnIndex.Number)
             {
                 //
             }
 
-            if (e.Column.DisplayIndex == 1) // ID
+            if ((ColumnIndex)e.Column.DisplayIndex == ColumnIndex.ID)
             {
                 //
             }
 
-            if (e.Column.DisplayIndex == 2) // Оригинал
+            if ((ColumnIndex)e.Column.DisplayIndex == ColumnIndex.Original)
             {
                 //
             }
 
-            if (e.Column.DisplayIndex == 3) // Перевод
+            if ((ColumnIndex)e.Column.DisplayIndex == ColumnIndex.Translated)
             {
                 if (e.EditAction == DataGridEditAction.Commit)
                 {
@@ -1075,6 +1103,8 @@ namespace ModTranslator
 
                     if (NewText != g_CurrentCellValue) // Если ячейка была изменена
                     {
+                        CatIsChanged(true);
+
                         if (NewText == string.Empty) // и стала пустой, то
                         {
                             if (TranslatedLines > 0)
@@ -1083,8 +1113,6 @@ namespace ModTranslator
 
                         if (g_CurrentCellValue == string.Empty) // Если ячейка была изменена и при этом она была пустой, то
                             TranslatedLines++; // увеличиваем счётчик.
-
-                        g_DataHasBeenChanged = true;
                     }
                     SetTranslateCountLabel(TranslatedLines);
 
@@ -1236,6 +1264,8 @@ namespace ModTranslator
 
                     ModFile.Rows = LoadedFile;
 
+                    ModFile.IsChanged = false;
+
                     CategoryList.Add(ModFile.Category);
                 }
             }
@@ -1260,13 +1290,22 @@ namespace ModTranslator
             if (!File.Exists(FilePath))
                 return false;
 
-            var LoadedData = ProcessOriginalFiles(FilePath);
+            var BindMod = WorkLoad.FindByFile(Path.GetFileName(FilePath));
 
-            if (LoadedData != null)
+            if (BindMod != null)
             {
-                RefreshMainGridAndSetCount(LoadedData);
+                var LoadedData = ProcessOriginalFiles(FilePath);
 
-                return true;
+                if (LoadedData != null)
+                {
+                    BindMod.IsChanged = false;
+
+                    BindMod.Rows = LoadedData;
+
+                    RefreshMainGridAndSetCount(BindMod.Rows);
+
+                    return true;
+                }
             }
             return false;
         }
@@ -1294,8 +1333,6 @@ namespace ModTranslator
 
         private void SelectFilesBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            //DataTextChangedMessage();
-
             g_CompareMode = false;
 
             var SelectedCategory = SelectFilesBox.SelectedValue?.ToString();
@@ -1423,7 +1460,7 @@ namespace ModTranslator
 
                 SetTranslateCountLabel();
 
-                g_DataHasBeenChanged = true;
+                CatIsChanged(true);
             }
         }
 
@@ -1441,7 +1478,10 @@ namespace ModTranslator
                 }
                 else
                 {
-                    DataTextChangedMessage();
+                    if (AskIfAllCatsChanged("Всё равно продолжить?", "Продолжить?", MessageBoxImage.Question) == 0)
+                        return;
+
+                    AllCatsIsChanged(false);
 
                     if (LoadModFilesAndCategories(ModPathText.Text) >= 0)
                     {
@@ -1459,7 +1499,7 @@ namespace ModTranslator
         {
             if (e.Key == Key.S && Keyboard.Modifiers == ModifierKeys.Control) // Ctrl + S
             {
-                g_DataHasBeenChanged = false;
+                CatIsChanged(false);
 
                 if (IsLoadDataGrid())
                 {
@@ -1494,7 +1534,10 @@ namespace ModTranslator
 
             if (e.Key == Key.F && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift)) // Ctrl + Shift + F
             {
-                DataTextChangedMessage();
+                if (AskIfCatIsChanged("Всё равно продолжить?", "Продолжить?", MessageBoxImage.Question) == 0)
+                    return;
+
+                CatIsChanged(false);
 
                 if (g_CompareMode)
                 {
