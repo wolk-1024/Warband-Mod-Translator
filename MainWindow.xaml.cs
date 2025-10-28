@@ -11,9 +11,12 @@
  *  Добавить больше горячих клавиш для поиска.
  */
 using Microsoft.Win32;
+using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Windows;
@@ -81,7 +84,7 @@ namespace ModTranslator
 
         public class WorkLoad
         {
-            public class ModInfo
+            public class CatInfo
             {
                 public string FileName   { get; set; } = string.Empty;
                 public string ExportName { get; set; } = string.Empty;
@@ -93,32 +96,40 @@ namespace ModTranslator
             /// <summary>
             /// Все данные для загрузки и экпорта файлов мода.
             /// </summary>
-            public static readonly List<ModInfo> BindingsList = new List<ModInfo>
+            private static readonly List<CatInfo> BindingsList = new List<CatInfo>
             {
-                new ModInfo { FileName = "conversation.txt",    ExportName = "dialogs.csv",         Category = "Диалоги" },
-                new ModInfo { FileName = "factions.txt",        ExportName = "factions.csv",        Category = "Фракции" },
-                new ModInfo { FileName = "info_pages.txt",      ExportName = "info_pages.csv",      Category = "Страницы информации" },
-                new ModInfo { FileName = "item_kinds1.txt",     ExportName = "item_kinds.csv",      Category = "Виды предметов" },
-                new ModInfo { FileName = "item_modifiers.txt",  ExportName = "item_modifiers.csv",  Category = "Состояние предметов" },
-                new ModInfo { FileName = "menus.txt",           ExportName = "game_menus.csv",      Category = "Игровое меню" },
-                new ModInfo { FileName = "parties.txt",         ExportName = "parties.csv" ,        Category = "Места" },
-                new ModInfo { FileName = "party_templates.txt", ExportName = "party_templates.csv", Category = "Шаблоны мест" },
-                new ModInfo { FileName = "quests.txt",          ExportName = "quests.csv",          Category = "Задания" },
-                new ModInfo { FileName = "quick_strings.txt",   ExportName = "quick_strings.csv",   Category = "Быстрые строки" },
-                new ModInfo { FileName = "skills.txt",          ExportName = "skills.csv",          Category = "Навыки" },
-                new ModInfo { FileName = "skins.txt",           ExportName = "skins.csv" ,          Category = "Скины" },
-                new ModInfo { FileName = "strings.txt",         ExportName = "game_strings.csv",    Category = "Игровые строки" },
-                new ModInfo { FileName = "troops.txt",          ExportName = "troops.csv",          Category = "Войска" }
+                new CatInfo { FileName = "conversation.txt",    ExportName = "dialogs.csv",         Category = "Диалоги" },
+                new CatInfo { FileName = "factions.txt",        ExportName = "factions.csv",        Category = "Фракции" },
+                new CatInfo { FileName = "info_pages.txt",      ExportName = "info_pages.csv",      Category = "Страницы информации" },
+                new CatInfo { FileName = "item_kinds1.txt",     ExportName = "item_kinds.csv",      Category = "Виды предметов" },
+                new CatInfo { FileName = "item_modifiers.txt",  ExportName = "item_modifiers.csv",  Category = "Состояние предметов" },
+                new CatInfo { FileName = "menus.txt",           ExportName = "game_menus.csv",      Category = "Игровое меню" },
+                new CatInfo { FileName = "parties.txt",         ExportName = "parties.csv" ,        Category = "Места" },
+                new CatInfo { FileName = "party_templates.txt", ExportName = "party_templates.csv", Category = "Шаблоны мест" },
+                new CatInfo { FileName = "quests.txt",          ExportName = "quests.csv",          Category = "Задания" },
+                new CatInfo { FileName = "quick_strings.txt",   ExportName = "quick_strings.csv",   Category = "Быстрые строки" },
+                new CatInfo { FileName = "skills.txt",          ExportName = "skills.csv",          Category = "Навыки" },
+                new CatInfo { FileName = "skins.txt",           ExportName = "skins.csv" ,          Category = "Скины" },
+                new CatInfo { FileName = "strings.txt",         ExportName = "game_strings.csv",    Category = "Игровые строки" },
+                new CatInfo { FileName = "troops.txt",          ExportName = "troops.csv",          Category = "Войска" }
             };
 
-            public static ModInfo? FindByCategory(string CategoryName, StringComparison Compare = StringComparison.OrdinalIgnoreCase)
+            public static CatInfo? FindByCategory(string CategoryName, StringComparison Compare = StringComparison.OrdinalIgnoreCase)
             {
                 return BindingsList.FirstOrDefault(x => (x != null) && string.Equals(x.Category, CategoryName, Compare), null);
             }
 
-            public static ModInfo? FindByFile(string FileName, StringComparison Compare = StringComparison.OrdinalIgnoreCase)
+            public static CatInfo? FindByFile(string FileName, StringComparison Compare = StringComparison.OrdinalIgnoreCase)
             {
                 return BindingsList.FirstOrDefault(x => (x != null) && string.Equals(x.Category, FileName, Compare), null);
+            }
+
+            /// <summary>
+            /// пример: dlga_ , trp_
+            /// </summary>
+            public static CatInfo? FindByPrefix(string Prefix)
+            {
+                return BindingsList.FirstOrDefault(bind => bind.Rows != null && bind.Rows.Any(row => row.RowId.StartsWith(Prefix)));
             }
 
             public static List<string> GetChangedCategories()
@@ -126,15 +137,16 @@ namespace ModTranslator
                 return BindingsList.Where(x => x.IsChanged).Select(x => x.Category).ToList();
             }
 
-            public static List<ModInfo> GetChangedModInfo()
+            public static List<CatInfo> GetChangedModInfo()
             {
                 return BindingsList.Where(x => x.IsChanged).ToList();
             }
 
-            public static List<ModInfo> GetBindings() 
+            public static List<CatInfo> GetBindings() 
             {
                 return BindingsList; 
             }
+
         }
 
         /// <summary>
@@ -274,8 +286,10 @@ namespace ModTranslator
             var List = WorkLoad.GetChangedModInfo();
 
             if (List.Count > 0)
-                foreach (var Item in List) 
+            {
+                foreach (var Item in List)
                     Item.IsChanged = Bool;
+            }
         }
 
         ///<summary>Установить состояние только для текущей категории</summary>
@@ -321,12 +335,12 @@ namespace ModTranslator
         /// <summary>
         /// 
         /// </summary>
-        private WorkLoad.ModInfo? GetCurrentMod()
+        private WorkLoad.CatInfo? GetCurrentMod()
         {
             var Bindings = MainDataGrid.ItemsSource as List<ModTextRow>;
 
             if (Bindings != null)
-                return WorkLoad.BindingsList.Find(x => (x.Rows == Bindings));
+                return WorkLoad.GetBindings().Find(x => (x.Rows == Bindings));
 
             return null;
         }
@@ -347,7 +361,7 @@ namespace ModTranslator
 
             MainDataGrid.Items.Refresh();
 
-            //FocusFirstVisibleRow();
+            FocusFirstVisibleRow();
         }
 
         public void RefreshMainGrid()
@@ -597,89 +611,81 @@ namespace ModTranslator
 
             List<ModTextRow>? Result = null;
 
-            try
-            {
-                var FileName = Path.GetFileName(FilePath);
+            var FileName = Path.GetFileName(FilePath);
 
-                switch (FileName)
-                {
-                    case "conversation.txt":
-                        {
-                            Result = Parser.LoadAndParseConversationFile(FilePath);
-                            break;
-                        }
-                    case "factions.txt":
-                        {
-                            Result = Parser.LoadAndParseFactionsFile(FilePath);
-                            break;
-                        }
-                    case "info_pages.txt":
-                        {
-                            Result = Parser.LoadAndParseInfoPagesFile(FilePath);
-                            break;
-                        }
-                    case "item_kinds1.txt":
-                        {
-                            Result = Parser.LoadAndParseItemKindsFile(FilePath);
-                            break;
-                        }
-                    case "item_modifiers.txt": // Этого файла часто не бывает в модах.
-                        {
-                            Result = Parser.LoadAndParseItemModifiersFile(FilePath);
-                            break;
-                        }
-                    case "menus.txt": // Есть проблемы: в файле ингода содержатся одинаковые id, но имеют разное значение.
-                        {
-                            Result = Parser.LoadAndParseMenuFile(FilePath);
-                            break;
-                        }
-                    case "parties.txt":
-                        {
-                            Result = Parser.LoadAndParsePartiesFile(FilePath);
-                            break;
-                        }
-                    case "party_templates.txt":
-                        {
-                            Result = Parser.LoadAndParsePartyTemplatesFile(FilePath);
-                            break;
-                        }
-                    case "quests.txt":
-                        {
-                            Result = Parser.LoadAndParseQuestsFile(FilePath);
-                            break;
-                        }
-                    case "quick_strings.txt":
-                        {
-                            Result = Parser.LoadAndParseQuickStringsFile(FilePath);
-                            break;
-                        }
-                    case "skills.txt":
-                        {
-                            Result = Parser.LoadAndParseSkillsFile(FilePath);
-                            break;
-                        }
-                    case "skins.txt":
-                        {
-                            Result = Parser.LoadAndParseSkinsFile(FilePath);
-                            break;
-                        }
-                    case "strings.txt":
-                        {
-                            Result = Parser.LoadAndParseStringsFile(FilePath);
-                            break;
-                        }
-                    case "troops.txt":
-                        {
-                            Result = Parser.LoadAndParseTroopsFile(FilePath);
-                            break;
-                        }
-                }
-            }
-            catch (Exception)
+            switch (FileName)
             {
-                MessageBox.Show($"При обработке: {FilePath} произошла критическая ошибка.", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Stop);
+                case "conversation.txt":
+                    {
+                        Result = Parser.LoadAndParseConversationFile(FilePath);
+                        break;
+                    }
+                case "factions.txt":
+                    {
+                        Result = Parser.LoadAndParseFactionsFile(FilePath);
+                        break;
+                    }
+                case "info_pages.txt":
+                    {
+                        Result = Parser.LoadAndParseInfoPagesFile(FilePath);
+                        break;
+                    }
+                case "item_kinds1.txt":
+                    {
+                        Result = Parser.LoadAndParseItemKindsFile(FilePath);
+                        break;
+                    }
+                case "item_modifiers.txt": // Этого файла часто не бывает в модах.
+                    {
+                        Result = Parser.LoadAndParseItemModifiersFile(FilePath);
+                        break;
+                    }
+                case "menus.txt": // Есть проблемы: в файле ингода содержатся одинаковые id, но имеют разное значение.
+                    {
+                        Result = Parser.LoadAndParseMenuFile(FilePath);
+                        break;
+                    }
+                case "parties.txt":
+                    {
+                        Result = Parser.LoadAndParsePartiesFile(FilePath);
+                        break;
+                    }
+                case "party_templates.txt":
+                    {
+                        Result = Parser.LoadAndParsePartyTemplatesFile(FilePath);
+                        break;
+                    }
+                case "quests.txt":
+                    {
+                        Result = Parser.LoadAndParseQuestsFile(FilePath);
+                        break;
+                    }
+                case "quick_strings.txt":
+                    {
+                        Result = Parser.LoadAndParseQuickStringsFile(FilePath);
+                        break;
+                    }
+                case "skills.txt":
+                    {
+                        Result = Parser.LoadAndParseSkillsFile(FilePath);
+                        break;
+                    }
+                case "skins.txt":
+                    {
+                        Result = Parser.LoadAndParseSkinsFile(FilePath);
+                        break;
+                    }
+                case "strings.txt":
+                    {
+                        Result = Parser.LoadAndParseStringsFile(FilePath);
+                        break;
+                    }
+                case "troops.txt":
+                    {
+                        Result = Parser.LoadAndParseTroopsFile(FilePath);
+                        break;
+                    }
 
-                return null;
             }
             return Result;
         }
@@ -816,32 +822,41 @@ namespace ModTranslator
         /// <param name="FilePath"></param>
         /// <param name="LoadInEmpty"></param>
         /// <returns></returns>
-        private TextImportInfo ImportTranslate(string FilePath, bool LoadInEmpty = false)
+        private async Task<TextImportInfo> ImportTranslate(string FilePath, bool LoadInEmpty = false)
         {
             var Result = new TextImportInfo { SuccessLoaded = 0 };
 
-            var TranslateData = ReadModTextCsvFile(FilePath, Settings.CsvSeparators, 3);
+            var MainRows = GetMainRows();
 
-            if (TranslateData.Count >= 1)
+            await Task.Run(() =>
             {
-                var MainRows = GetMainRows();
+                var TranslateData = ReadModTextCsvFile(FilePath, Settings.CsvSeparators, 3);
 
-                foreach (ModTextRow Data in TranslateData)
+                if (TranslateData.Count >= 1)
                 {
-                    if (Parser.IsDummyRow(Data)) // Не импортируем "противобаговую" строку.
-                        continue;
-
-                    // Чувствителен к регистру.
-                    var DataIndex = MainRows.FindIndex(0, MainRows.Count, Item => string.Equals(Item.RowId, Data.RowId, StringComparison.Ordinal)); // Ищем совпадения по Id
-
-                    // Не чуствителен
-                    //var DataIndex = g_CurrentMainGridData.FindIndex(0, g_CurrentMainGridData.Count, Item => string.Equals(Item.RowId, Data.RowId, StringComparison.OrdinalIgnoreCase));
-
-                    if (DataIndex >= 0)
+                    foreach (ModTextRow Data in TranslateData)
                     {
-                        if (LoadInEmpty) // Загрузка только в пустые
+                        if (Parser.IsDummyRow(Data)) // Не импортируем "противобаговую" строку.
+                            continue;
+
+                        // Чувствителен к регистру.
+                        var DataIndex = MainRows.FindIndex(0, MainRows.Count, Item => string.Equals(Item.RowId, Data.RowId, StringComparison.Ordinal)); // Ищем совпадения по Id
+
+                        // Не чуствителен
+                        //var DataIndex = g_CurrentMainGridData.FindIndex(0, g_CurrentMainGridData.Count, Item => string.Equals(Item.RowId, Data.RowId, StringComparison.OrdinalIgnoreCase));
+
+                        if (DataIndex >= 0)
                         {
-                            if (string.IsNullOrEmpty(MainRows[DataIndex].TranslatedText))
+                            if (LoadInEmpty) // Загрузка только в пустые
+                            {
+                                if (string.IsNullOrEmpty(MainRows[DataIndex].TranslatedText))
+                                {
+                                    MainRows[DataIndex].TranslatedText = Data.TranslatedText;
+
+                                    Result.SuccessLoaded++;
+                                }
+                            }
+                            else
                             {
                                 MainRows[DataIndex].TranslatedText = Data.TranslatedText;
 
@@ -849,17 +864,12 @@ namespace ModTranslator
                             }
                         }
                         else
-                        {
-                            MainRows[DataIndex].TranslatedText = Data.TranslatedText;
-
-                            Result.SuccessLoaded++;
-                        }
+                            Result.FailedLoad.Add(Data); // В файле-переводе и оригинале нет совпадения ID. (Вероятно, импортируемый файл может быть старой версией перевода)
                     }
-                    else
-                        Result.FailedLoad.Add(Data); // В файле-переводе и оригинале нет совпадения ID. (Вероятно, импортируемый файл может быть старой версией перевода)
                 }
-                RefreshMainGrid(MainRows);
-            }
+            });
+            RefreshMainGrid(MainRows);
+
             return Result;
         }
 
@@ -1233,51 +1243,69 @@ namespace ModTranslator
         }
 
         /// <summary>
-        /// 
+        /// Главная функция для загрузки мода
         /// </summary>
         /// <param name="ModFolderPath"></param>
         /// <returns></returns>
-        private int LoadModFilesAndCategories(string ModFolderPath)
+        private async Task<int> LoadModFilesAndCategories(string ModFolderPath)
         {
-            var LoadCount = -1;
+            var Result = -1;
 
-            var CategoryList = new List<string> { };
+            string FullPath = "nofile";
 
-            foreach (var ModFile in WorkLoad.GetBindings())
+            try
             {
-                string FullPath = Path.Combine(ModFolderPath, ModFile.FileName);
+                if (!Directory.Exists(ModFolderPath))
+                    return -1;
 
-                if (File.Exists(FullPath))
+                var Categories = new List<string> { };
+
+                foreach (var ModFile in WorkLoad.GetBindings())
                 {
-                    var LoadedFile = ProcessOriginalFiles(FullPath);
+                    FullPath = Path.Combine(ModFolderPath, ModFile.FileName);
 
-                    if (LoadedFile == null)
+                    if (File.Exists(FullPath))
                     {
-                        var Ask = MessageBox.Show($"При загрузке {FullPath} произшла ошибка. Продолжить загрузку?", "Ошибка загрузки", MessageBoxButton.YesNo, MessageBoxImage.Error);
+                        var LoadedFile = await Task.Run(() => ProcessOriginalFiles(FullPath));
 
-                        if (Ask == MessageBoxResult.Yes)
-                            continue;
+                        if (LoadedFile == null)
+                        {
+                            var Ask = MessageBox.Show($"При загрузке {FullPath} произшла ошибка. Всё равно продолжить загрузку?", "Ошибка загрузки", MessageBoxButton.YesNo, MessageBoxImage.Warning);
 
-                        return -1;
+                            if (Ask == MessageBoxResult.Yes)
+                                continue;
+                            else
+                                return -1;
+                        }
+                        ModFile.Rows = LoadedFile;
+
+                        Categories.Add(ModFile.Category);
+
+                        Result++;
                     }
-                    LoadCount++;
+                }
+                if (Result >= 0)
+                {
+                    AllCatsIsChanged(false);
 
-                    ModFile.Rows = LoadedFile;
+                    SelectFilesBox.SelectedIndex = 0;
 
-                    ModFile.IsChanged = false;
+                    SelectFilesBox.ItemsSource = Categories;
 
-                    CategoryList.Add(ModFile.Category);
+                    SelectFilesBox.Items.Refresh();
                 }
             }
-            if (LoadCount >= 0)
+            catch (Exception)
             {
-                SelectFilesBox.SelectedIndex = 0;
+                MessageBox.Show(
+                    $"При обработке: {FullPath} произошла критическая ошибка.",
+                    "Ошибка",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Stop);
 
-                SelectFilesBox.ItemsSource = CategoryList;
-
-                SelectFilesBox.Items.Refresh();
+                return -1;
             }
-            return LoadCount;
+            return Result;
         }
 
         /// <summary>
@@ -1374,7 +1402,7 @@ namespace ModTranslator
             }
         }
 
-        private void OpenModButton_Click(object sender, RoutedEventArgs e)
+        private async void OpenModButton_Click(object sender, RoutedEventArgs e)
         {
             var FolderDialog = new OpenFolderDialog();
 
@@ -1390,7 +1418,7 @@ namespace ModTranslator
 
                 g_ModFolderPath  = FolderDialog.FolderName;
 
-                if (LoadModFilesAndCategories(FolderDialog.FolderName) == -1)
+                if (await LoadModFilesAndCategories(FolderDialog.FolderName) == -1)
                 {
                     MessageBox.Show("Неверный мод.", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
 
@@ -1418,7 +1446,7 @@ namespace ModTranslator
             ExportFileDialog();
         }
 
-        private void ImportButton_Click(object sender, RoutedEventArgs e)
+        private async void ImportButton_Click(object sender, RoutedEventArgs e)
         {
             if (!IsLoadDataGrid())
                 return;
@@ -1443,7 +1471,7 @@ namespace ModTranslator
 
             if (DialogFile.ShowDialog() == true)
             {
-                var Result = ImportTranslate(DialogFile.FileName, (g_OptionsWindow.ImportOnlyInEmpty.IsChecked == true));
+                var Result = await ImportTranslate(DialogFile.FileName, (g_OptionsWindow.ImportOnlyInEmpty.IsChecked == true));
 
                 if (Result.FailedLoad.Count > 0 && g_OptionsWindow.ImportLog.IsChecked == true)
                 {
@@ -1453,7 +1481,6 @@ namespace ModTranslator
                             WriteText.WriteLine(FailLine.RowId + "|" + FailLine.TranslatedText);
                     }
                 }
-
                 var FormatedResult = string.Format("Загружено: {0}\rНет совпадений: {1}", Result.SuccessLoaded, Result.FailedLoad.Count);
 
                 MessageBox.Show(FormatedResult, "Импорт", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -1464,7 +1491,7 @@ namespace ModTranslator
             }
         }
 
-        private void ModPathText_KeyDown(object sender, KeyEventArgs e)
+        private async void ModPathText_KeyDown(object sender, KeyEventArgs e)
         {
             if (e.Key == Key.Enter) // Ввод
             {
@@ -1483,7 +1510,7 @@ namespace ModTranslator
 
                     AllCatsIsChanged(false);
 
-                    if (LoadModFilesAndCategories(ModPathText.Text) >= 0)
+                    if (await LoadModFilesAndCategories(ModPathText.Text) >= 0)
                     {
                         g_ModFolderPath = ModPathText.Text;
 
@@ -1499,11 +1526,11 @@ namespace ModTranslator
         {
             if (e.Key == Key.S && Keyboard.Modifiers == ModifierKeys.Control) // Ctrl + S
             {
-                CatIsChanged(false);
-
                 if (IsLoadDataGrid())
                 {
                     ExportFileDialog();
+
+                    //CatIsChanged(false);
                 }
                 e.Handled = true;
             }
@@ -1534,11 +1561,6 @@ namespace ModTranslator
 
             if (e.Key == Key.F && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift)) // Ctrl + Shift + F
             {
-                if (AskIfCatIsChanged("Всё равно продолжить?", "Продолжить?", MessageBoxImage.Question) == 0)
-                    return;
-
-                CatIsChanged(false);
-
                 if (g_CompareMode)
                 {
                     g_CompareMode = false;
@@ -1550,6 +1572,11 @@ namespace ModTranslator
                 }
                 else
                 {
+                    if (AskIfCatIsChanged("Всё равно продолжить?", "Продолжить?", MessageBoxImage.Question) == 0)
+                        return;
+
+                    CatIsChanged(false);
+
                     if (ChooseModAndSeeDifference())
                     {
                         g_CompareMode = true;
@@ -2080,7 +2107,6 @@ namespace ModTranslator
             }
             return null;
         }
-
 
     }
 }
