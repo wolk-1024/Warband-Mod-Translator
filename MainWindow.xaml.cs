@@ -10,7 +10,9 @@
  *  Доработать поиск.
  *  Добавить больше горячих клавиш для поиска.
  */
+using EncodingTextFile;
 using Microsoft.Win32;
+using ModTranslatorSettings;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -28,8 +30,7 @@ using System.Windows.Media;
 using WarbandAbout;
 using WarbandParser;
 using WarbandSearch;
-using ModTranslatorSettings;
-using EncodingTextFile;
+using static System.Net.Mime.MediaTypeNames;
 
 //#nullable disable
 
@@ -72,14 +73,24 @@ namespace ModTranslator
             public static SolidColorBrush DefaultRowColor = Brushes.White;
 
             /// <summary>
-            /// Цвет подсветки строк с женскими персонажами.
+            /// Цвет подсветки женщин-нпс
             /// </summary>
-            public static SolidColorBrush FemalesColor = Brushes.Pink;
+            public static SolidColorBrush FemalesColor = new SolidColorBrush(Color.FromArgb(150, 255, 182, 193)); // Светлорозовый
 
             /// <summary>
-            /// Цвет для неизвестных строк.
+            /// Цвет для нпс-мужиков
+            /// </summary>
+            public static SolidColorBrush MansColor = new SolidColorBrush(Color.FromArgb(145, 255, 240, 225)); // Песочный
+
+            /// <summary>
+            /// Цвет для неизвестных.
             /// </summary>
             public static SolidColorBrush UnknownsColor = Brushes.LightGray;
+
+            /// <summary>
+            /// Цвет для подсветки групп
+            /// </summary>
+            public static SolidColorBrush GroupsColor = Brushes.Azure; // Стоит ли подсвечивать группы вообще?
         }
 
         public class WorkLoad
@@ -104,14 +115,14 @@ namespace ModTranslator
                 new CatInfo { FileName = "item_kinds1.txt",     ExportName = "item_kinds.csv",      Category = "Виды предметов" },
                 new CatInfo { FileName = "item_modifiers.txt",  ExportName = "item_modifiers.csv",  Category = "Состояние предметов" },
                 new CatInfo { FileName = "menus.txt",           ExportName = "game_menus.csv",      Category = "Игровое меню" },
-                new CatInfo { FileName = "parties.txt",         ExportName = "parties.csv" ,        Category = "Места" },
-                new CatInfo { FileName = "party_templates.txt", ExportName = "party_templates.csv", Category = "Шаблоны мест" },
+                new CatInfo { FileName = "parties.txt",         ExportName = "parties.csv" ,        Category = "Локации" },
+                new CatInfo { FileName = "party_templates.txt", ExportName = "party_templates.csv", Category = "Группы" },
                 new CatInfo { FileName = "quests.txt",          ExportName = "quests.csv",          Category = "Задания" },
                 new CatInfo { FileName = "quick_strings.txt",   ExportName = "quick_strings.csv",   Category = "Быстрые строки" },
                 new CatInfo { FileName = "skills.txt",          ExportName = "skills.csv",          Category = "Навыки" },
                 new CatInfo { FileName = "skins.txt",           ExportName = "skins.csv" ,          Category = "Скины" },
                 new CatInfo { FileName = "strings.txt",         ExportName = "game_strings.csv",    Category = "Игровые строки" },
-                new CatInfo { FileName = "troops.txt",          ExportName = "troops.csv",          Category = "Войска" }
+                new CatInfo { FileName = "troops.txt",          ExportName = "troops.csv",          Category = "Персонажи" }
             };
 
             public static CatInfo? FindByCategory(string CategoryName, StringComparison Compare = StringComparison.OrdinalIgnoreCase)
@@ -1288,6 +1299,8 @@ namespace ModTranslator
                 {
                     AllCatsIsChanged(false);
 
+                    PrepareCategoriesForTable();
+
                     SelectFilesBox.SelectedIndex = 0;
 
                     SelectFilesBox.ItemsSource = Categories;
@@ -2033,79 +2046,168 @@ namespace ModTranslator
                 {
                     RowData.Visibility = Visibility.Visible;
 
-                    //DataGridRow Row = (DataGridRow)MainDataGrid.ItemContainerGenerator.ContainerFromItem(ModText);
-
                     RowData.ToolTip = GetRowToolTipText(ModText);
 
-                    if (g_OptionsWindow != null && ModText.NPC != null)
+                    if (g_OptionsWindow != null)
                     {
                         var ShowNpc = g_OptionsWindow.ShowNPC.IsChecked ?? true; // По умолчанию включено.
 
-                        if (ModText.NPC.IsWoman)
+                        if (ShowNpc)
                         {
-                            if (ShowNpc)
-                                RowData.Background = Settings.FemalesColor;
+                            if (ModText.NPC != null)
+                            {
+                                var NPC = ModText.NPC;
+
+                                if (NPC.IsWoman)
+                                {
+                                   RowData.Background = Settings.FemalesColor;
+                                }
+                                else if (NPC.IsMan)
+                                {
+                                    RowData.Background = Settings.MansColor;
+                                }
+                                else if (NPC.IsOther)
+                                {
+                                   RowData.Background = Settings.UnknownsColor;
+                                }
+                                else
+                                    RowData.Background = Settings.DefaultRowColor;
+                            }
+
+                            if (ModText.Dialogue != null)
+                            {
+                                var Talking = ModText.Dialogue;
+
+                                var TalkingWith = ModText.Dialogue.TalkingWith;
+
+                                // Если нпс-женщина говорит с игроком или игрок обращается к женщине-нпс 
+                                if ((Talking.IsNpc || Talking.IsPlayer) && TalkingWith.IsWoman)
+                                {
+                                    RowData.Background = Settings.FemalesColor;
+                                }
+                                // Если нпс-мужик говорит с игроком или игрок обращается к мужику 
+                                else if ((Talking.IsNpc || Talking.IsPlayer) && TalkingWith.IsMan)
+                                {
+                                    RowData.Background = Settings.MansColor;
+                                }
+                                // Если непонятно какой нпс говорит с игроком или игрок обращается к непонято кому)
+                                else if ((Talking.IsNpc || Talking.IsPlayer) && TalkingWith.IsOther)
+                                {
+                                    RowData.Background = Settings.UnknownsColor;
+                                }
+                                // Если группа
+                                else if (Talking.IsParty)
+                                {
+                                    RowData.Background = Settings.GroupsColor;
+                                }
+                                else
+                                    RowData.Background = Settings.DefaultRowColor;
+                            }
                         }
-                        else if (ModText.NPC.IsOther)
-                        {
-                            if (ShowNpc)
-                                RowData.Background = Settings.UnknownsColor;
-                        }
-                        else 
-                            RowData.Background = Settings.DefaultRowColor;
                     }
                 }
             }
         }
 
-        private string? GetRowToolTipText(ModTextRow? Mod)
+        private string GetNpcSex(NpcType? Npc)
+        {
+            if (Npc != null)
+            {
+                if (Npc.IsOther)
+                    return "Неизвестно";
+
+                if (Npc.IsWoman)
+                    return "Женщина";
+                else if (Npc.IsMan)
+                    return "Мужчина";
+            }
+            return "Неизвестно";
+        }
+
+        private string? GetRowToolTipText(ModTextRow? Row)
         {
             StringBuilder Text = new StringBuilder();
 
-            if (Mod != null)
+            if (Row != null)
             {
-                // Войска
-                if (Mod.NPC != null)
+                // Персонажи
+                if (Row.NPC != null)
                 {
-                    var Npc = Mod.NPC;
+                    var WhoIsNpc = Row.NPC;
 
-                    if (Npc.IsOther)
-                        Text.AppendLine("Неизвестно");
-                    else
-                        Text.AppendLine("Человек");
+                    Text.AppendLine(GetNpcSex(WhoIsNpc));
 
-                    if (!Npc.IsOther)
-                    {
-                        if (Npc.IsWoman)
-                            Text.AppendLine("Женщина");
-                        else
-                            Text.AppendLine("Мужчина");
-                    }
-
-                    if (Npc.IsHero)
+                    if (WhoIsNpc.IsHero)
                         Text.AppendLine("Герой");
 
-                    if (Npc.IsMerchant)
+                    if (WhoIsNpc.IsMerchant)
                         Text.AppendLine("Торговец");
 
                     if (Text.Length > 0)
                         return Text.ToString().Trim();
                 }
                 // Диалоги
-                else if (Mod.Dialogue != null)
+                if (Row.Dialogue != null)
                 {
-                    var Dialogue = Mod.Dialogue;
+                    var Talking = Row.Dialogue;
 
-                    if (Dialogue.IsPlayer && Dialogue.IsAnyone)
-                        Text.AppendLine("Игрок говорит с NPC");
-                    else if (Dialogue.IsAnyone)
-                        Text.AppendLine("NPC говорит с игроком");
+                    if (Talking.IsPlayer && Talking.IsAnyone)
+                    {
+                        Text.Append($"Кто: Игрок\nКому: Кому-то");
+                    }
+                    else if (Talking.IsAnyone && !Talking.IsPlayer)
+                    {
+                        Text.Append($"Кто: Кто-то\nКому: Игроку");
+                    }
+                    else if (Talking.IsParty && !Talking.IsPlayer)
+                    {
+                        Text.Append($"Кто: Группа {Talking.TalkingWith.ID}\nКому: Игроку");
+                    }
+                    else if (Talking.IsParty && Talking.IsPlayer)
+                    {
+                        Text.Append($"Кто: Игрок\nКому: Группе {Talking.TalkingWith.ID}");
+                    }
+                    else if (Talking.IsPlayer && Talking.IsNpc)
+                    {
+                        Text.Append($"Кто: Игрок\nКому: {Talking.TalkingWith.ID} ({GetNpcSex(Talking.TalkingWith).ToLower()})");
+                    }
+                    else if (Talking.IsNpc)
+                    {
+                        Text.Append($"Кто: {Talking.TalkingWith.ID} ({GetNpcSex(Talking.TalkingWith).ToLower()})\nКому: Игроку");
+                    }
 
                     if (Text.Length > 0)
-                        return Text.ToString().Trim();
+                        return Text.ToString();
                 }
             }
             return null;
+        }
+
+        // Fixme: cделать всё в парсере, а не так.
+        private async void PrepareCategoriesForTable()
+        {
+            await Task.Run(() =>
+            {
+                var TroopsCategory = WorkLoad.FindByPrefix("trp_");
+
+                if (TroopsCategory != null && TroopsCategory.Rows != null)
+                {
+                    var DialogCategory = WorkLoad.FindByPrefix("dlga_");
+
+                    if (DialogCategory != null && DialogCategory.Rows != null)
+                    {
+                        var PartyTemplateCategory = WorkLoad.FindByPrefix("pt_");
+
+                        if (PartyTemplateCategory != null && PartyTemplateCategory.Rows != null)
+                        {
+                            foreach (var Dialog in DialogCategory.Rows)
+                            {
+                                Dialog.Dialogue = Parser.GetDialogueCondition(Dialog.RawLine, TroopsCategory.Rows, PartyTemplateCategory.Rows);
+                            }
+                        }
+                    }
+                }
+            });
         }
 
     }

@@ -15,6 +15,7 @@
     /// </summary>
     public class ModTextRow : ModRowInfo
     {
+        //
         public int RowNum            { get; set; } = 0;
         public string RowId          { get; set; } = string.Empty;
         public string OriginalText   { get; set; } = string.Empty;
@@ -28,6 +29,8 @@
     {
         public RowFlags Flags { get; set; } = RowFlags.None;
 
+        public string RawLine { get; set; } = string.Empty;
+
         public (int Start, int End) DataPos { get; set; } = (-1, -1); // Позиция данных в оригинальном файле. Используется пока только для menus.txt
     }
 
@@ -38,6 +41,10 @@
         public bool IsOther    = false;  // Нпс не человек, а например гуль или робот
         public bool IsHero     = false;  // Нпс-герой
         public bool IsMerchant = false;  // Нпс-торговец
+
+        public string ID = string.Empty;         // Id в войсках / группах
+        public string Name = string.Empty;       // Имя нпс в ед.числе
+        public string NamePlural = string.Empty; // Имя нпс в мн.числе род.падеже. (обычно)
     }
 
     /// <summary>
@@ -68,6 +75,9 @@
         public bool IsPlayer = false;
         public bool IsAnyone = false;
         public bool IsParty  = false;
+        public bool IsNpc    = false;
+
+        public NpcType TalkingWith = new NpcType();
     }
 
     public class DialogLine

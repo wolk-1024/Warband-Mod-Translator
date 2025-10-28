@@ -1,9 +1,6 @@
 ﻿/*
- *  Парсер v24.10.2025
+ *  Парсер v28.10.2025
  *  
- *  Известные проблемы: 
- *  
- *  1) Если строка, например, в меню будет состоять только из чисел, то парсер не сможет их найти, т.к нет пока возможности отделить флаги от текста.
  */
 
 #define USE_OLDPARSE
@@ -532,7 +529,85 @@ namespace WarbandParser
         }
         */
 
-        public static WhoTalking GetDialogueStates(string DialogeLine)
+        private static WhoTalking GetDialogueCondition(uint? DialogueFlags, List<ModTextRow>? TroopsList = null, List<ModTextRow>? PartyTempList = null)
+        {
+            WhoTalking Result = new WhoTalking();
+
+            if (DialogueFlags != null)
+            {
+                if ((DialogueFlags & 0x00010000) != 0) // plyr
+                    Result.IsPlayer = true; // Реплику говорит игрок.
+
+                uint PartnerNumber = (uint)(DialogueFlags & 0x00000FFF); // В PartnerNumber будет порядковый номер нпс или группы
+
+                if (PartnerNumber == 0x00000FFF) // anyone
+                {
+                    Result.IsAnyone = true; // Говорит кто угодно/кому угодно.
+                }
+                else if (PartnerNumber != 0) // Говорит кто-то конкретно.
+                {
+                    if ((DialogueFlags & 0x00020000) != 0) // party_tpl
+                    {
+                        // В PartnerNumber номер группы
+                        Result.IsParty = true; // Говорит группа
+
+                        if (PartyTempList != null)
+                        {
+                            var PartyInfo = GetTroopOrGroupByNumber(PartyTempList, (int)PartnerNumber);
+
+                            if (PartyInfo != null)
+                            {
+                                Result.TalkingWith.ID = PartyInfo.RowId;
+
+                                Result.TalkingWith.Name = PartyInfo.OriginalText;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // В PartnerNumber номер нпс.
+                        Result.IsNpc = true; // Говорит нпс / игрок говорит с нпс
+
+                        if (TroopsList != null)
+                        {
+                            var TroopInfo = GetTroopOrGroupByNumber(TroopsList, (int)PartnerNumber);
+
+                            if (TroopInfo != null && TroopInfo.NPC != null)
+                            {
+                                Result.TalkingWith = TroopInfo.NPC;
+                            }
+                        }
+                    }
+                }
+
+                uint OtherNumber = (uint)(DialogueFlags & 0xFFF00000) >> 20; // other
+
+                if (OtherNumber != 0) // Говорит кто-то со стороны.
+                {
+                    Result.IsNpc = true;
+
+                    if (TroopsList != null)
+                    {
+                        var TroopInfo = GetTroopOrGroupByNumber(TroopsList, (int)PartnerNumber);
+
+                        if (TroopInfo != null && TroopInfo.NPC != null)
+                        {
+                            Result.TalkingWith = TroopInfo.NPC;
+                        }
+                    }
+                }
+            }
+            return Result;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="DialogeLine">сюда ModTextRow.RawLine</param>
+        /// <param name="TroopsList"></param>
+        /// <param name="PartyTempList"></param>
+        /// <returns></returns>
+        public static WhoTalking GetDialogueCondition(string DialogeLine, List<ModTextRow>? TroopsList = null, List<ModTextRow>? PartyTempList = null)
         {
             WhoTalking Result = new WhoTalking();
 
@@ -544,32 +619,18 @@ namespace WarbandParser
                 var DialogueFlags = GetIntArg(DialogeLine, 1);
 
                 if (DialogueFlags != null)
-                {
-                    var Flags = (DialogStates)(DialogueFlags);
-
-                    if (Flags.HasFlag(DialogStates.plyr)) // Строку произносит игрок.
-                        Result.IsPlayer = true;
-
-                    if (Flags.HasFlag(DialogStates.anyone)) // Общие диалоги для всех нпс.
-                    {
-                        Result.IsAnyone = true;
-                    }
-                    else if (Flags.HasFlag(DialogStates.party_tpl)) // Разговор с группой
-                    {
-                        Result.IsParty = true;
-                    }
-                }
+                    return GetDialogueCondition((uint)DialogueFlags, TroopsList, PartyTempList);
             }
             return Result;
         }
 
-        public static DialogLine ParseDialogueLine(string DualogueLine)
+        private static DialogLine ParseDialogueLine(string DialogueLine)
         {
             var Result = new DialogLine();
 
-            if (IsLineStartsWithPrefix(DualogueLine, "dlga_"))
+            if (IsLineStartsWithPrefix(DialogueLine, "dlga_"))
             {
-                var AllParams = DualogueLine.Split(" ", StringSplitOptions.RemoveEmptyEntries);
+                var AllParams = DialogueLine.Split(" ", StringSplitOptions.RemoveEmptyEntries);
 
                 int CurrentPos = 3;
 
@@ -599,8 +660,10 @@ namespace WarbandParser
                             if (ResPos <= AllParams.Length)
                             {
                                 Result.ID = AllParams.First(); // ID диалога (dlga_ramun и т.д)
+
                                 Result.Text = AllParams[ResPos]; // Текст реплики.
-                                Result.States = GetDialogueStates(DualogueLine);
+
+                                //Result.States = GetDialogueState(DualogueLine, TroopsList, PartyTempList);
                             }
                         }
                     }
@@ -630,9 +693,9 @@ namespace WarbandParser
                     {
                         Result.Add(new ModTextRow
                         {
-                            RowId        = DlgResult.ID ?? "PARSER_ERROR",
-                            Flags        = RowFlags.ParseError,
-                            DataPos      = (Line.Start, Line.End)
+                            RowId   = DlgResult.ID ?? "PARSER_ERROR",
+                            Flags   = RowFlags.ParseError,
+                            DataPos = (Line.Start, Line.End)
                         });
 
                         continue;
@@ -646,8 +709,9 @@ namespace WarbandParser
                     {
                         RowId        = DlgResult.ID,
                         OriginalText = DialogText,
-                        Dialogue     = DlgResult.States,
+                        //Dialogue   = DlgResult.States,
                         Flags        = NewFlags,
+                        RawLine      = Line,
                         DataPos      = (Line.Start, Line.End)
                     });
                 }
@@ -1266,8 +1330,6 @@ namespace WarbandParser
 
                     string StringText = GetAnyArg(String, 2).Replace("_", " ");
 
-                    // Могут быть строки.
-
                     if (string.IsNullOrEmpty(StringID) || string.IsNullOrEmpty(StringText))
                     {
                         Result.Add(new ModTextRow
@@ -1295,8 +1357,7 @@ namespace WarbandParser
             return Result;
         }
 
-        // FixmeЖ
-        private static NpcType GetTroopType(string TroopLine)
+        private static NpcType ParseTroopLine(string TroopLine)
         {
             var Result = new NpcType();
 
@@ -1305,6 +1366,12 @@ namespace WarbandParser
 
             if (IsLineStartsWithPrefix(TroopLine, "trp_"))
             {
+                Result.ID = GetStringArg(TroopLine, 1);
+
+                Result.Name = GetStringArg(TroopLine, 2);
+
+                Result.NamePlural = GetStringArg(TroopLine, 3);
+
                 var TroopFlags = GetIntArg(TroopLine, 2);
 
                 if (TroopFlags != null)
@@ -1332,6 +1399,21 @@ namespace WarbandParser
             return Result;
         }
 
+        /// <summary>
+        /// Функция для получения строки с нпс или группы по его номеру (от 0). (игнорируя _pl)
+        /// </summary>
+        private static ModTextRow? GetTroopOrGroupByNumber(List<ModTextRow> DataList, int Number)
+        {
+            var TroopsWithNoPlural = DataList
+                .Where(s => !s.RowId.EndsWith("_pl", StringComparison.Ordinal))
+                .ToList();
+
+            if (TroopsWithNoPlural.Count >= Number)
+                return TroopsWithNoPlural[Number];
+            else
+                return null;
+        }
+
         public static List<ModTextRow> LoadAndParseTroopsFile(string FilePath)
         {
             var Result = new List<ModTextRow>();
@@ -1347,45 +1429,39 @@ namespace WarbandParser
                 {
                     // ID, Название, Название (мн.числ), 0, Флаги
 
-                    var TroopID = GetStringArg(Npc, 1);
+                    var Troop = ParseTroopLine(Npc);
 
-                    var TroopName = GetStringArg(Npc, 2).Replace("_", " ");
-
-                    var TroopNamePlural = GetStringArg(Npc, 3).Replace("_", " ");
-
-                    if (string.IsNullOrEmpty(TroopID) || string.IsNullOrEmpty(TroopName) || string.IsNullOrEmpty(TroopNamePlural))
+                    if (string.IsNullOrEmpty(Troop.ID) || string.IsNullOrEmpty(Troop.Name) || string.IsNullOrEmpty(Troop.NamePlural))
                     {
                         Result.Add(new ModTextRow
                         {
-                            RowId   = TroopID ?? "PARSER_ERROR",
+                            RowId   = Troop.ID ?? "PARSER_ERROR",
                             Flags   = RowFlags.ParseError,
                             DataPos = (Npc.Start, Npc.End)
                         });
                         continue;
                     }
 
-                    RowFlags NewFlags = IsBlockedLine(TroopName) ? RowFlags.BlockSymbol : RowFlags.None;
-
-                    var NpcType = GetTroopType(Npc);
+                    RowFlags NewFlags = IsBlockedLine(Troop.Name) ? RowFlags.BlockSymbol : RowFlags.None;
 
                     Result.Add(new ModTextRow
                     {
-                        RowId        = TroopID,
-                        OriginalText = TroopName,
-                        NPC          = NpcType,
+                        RowId        = Troop.ID,
+                        OriginalText = Troop.Name.Replace("_", " "),
+                        NPC          = Troop,
                         Flags        = NewFlags,
                         DataPos      = (Npc.Start, Npc.End)
                     });
 
-                    string NewTroopID = TroopID + "_pl";
+                    string NewTroopID = Troop.ID + "_pl";
 
-                    NewFlags = IsBlockedLine(TroopNamePlural) ? RowFlags.BlockSymbol : RowFlags.None;
+                    NewFlags = IsBlockedLine(Troop.NamePlural) ? RowFlags.BlockSymbol : RowFlags.None;
 
                     Result.Add(new ModTextRow
                     {
                         RowId        = NewTroopID,
-                        OriginalText = TroopNamePlural,
-                        NPC          = NpcType,
+                        OriginalText = Troop.NamePlural.Replace("_", " "),
+                        NPC          = Troop,
                         Flags        = NewFlags,
                         DataPos      = (Npc.Start, Npc.End)
                     });
