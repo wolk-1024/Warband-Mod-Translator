@@ -1,9 +1,9 @@
-﻿using System.IO;
-using System.Windows;
-using Microsoft.Win32;
-
+﻿using Microsoft.Win32;
 using ModTranslator;
+using System.IO;
+using System.Windows;
 using WarbandParser;
+using static ModTranslator.MainTranslatorWindow;
 
 namespace ModTranslatorSettings
 {
@@ -18,6 +18,13 @@ namespace ModTranslatorSettings
         /// Главное окно.
         /// </summary>
         private MainTranslatorWindow MainWindow;
+
+        /// <summary>
+        /// 
+        /// </summary>
+        private List<WorkLoad.CatInfo> g_OldCatsData = new List<WorkLoad.CatInfo>();
+
+        public bool g_CompareMode = false;
 
         private bool g_HideWindow = true;
 
@@ -40,7 +47,7 @@ namespace ModTranslatorSettings
 
             InitSettingsWindow();
 
-            MainWindow = Window;
+            this.MainWindow = Window;
 
             Parser.g_DeleteDublicatesIDs = !this.ShowDubsID.IsChecked ?? true;
 
@@ -49,14 +56,14 @@ namespace ModTranslatorSettings
 
         public void CloseWindow()
         {
-            g_HideWindow = false;
+            this.g_HideWindow = false;
 
             this.Close();
         }
 
         private void SettingsWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
         {
-            if (g_HideWindow == true) // По умолчанию не закрываем окно, а делаем невидимым.
+            if (this.g_HideWindow == true) // По умолчанию не закрываем окно, а делаем невидимым.
             {
                 this.Hide();
 
@@ -68,105 +75,199 @@ namespace ModTranslatorSettings
 
         private void ShowID_Checked(object sender, RoutedEventArgs e)
         {
-            if (MainWindow != null)
+            if (this.MainWindow != null)
             {
-                MainWindow.SetColumnVisibility("ID", Visibility.Visible);
+                this.MainWindow.SetColumnVisibility("ID", Visibility.Visible);
             }
         }
 
         private void ShowID_Unchecked(object sender, RoutedEventArgs e)
         {
-            if (MainWindow != null)
+            if (this.MainWindow != null)
             {
-                MainWindow.SetColumnVisibility("ID", Visibility.Collapsed);
+                this.MainWindow.SetColumnVisibility("ID", Visibility.Collapsed);
             }
         }
 
         private void ShowDubsID_Checked(object sender, RoutedEventArgs e)
         {
-            if (MainWindow != null)
+            if (this.MainWindow != null)
             {
                 Parser.g_DeleteDublicatesIDs = false;
 
-                if (MainWindow.IsLoadDataGrid())
+                if (this.MainWindow.IsLoadDataGrid())
                 {
-                    MainWindow.RefreshMainGridAndSetCount();
+                    this.MainWindow.RefreshMainGridAndSetCount();
                 }
             }
         }
 
         private void ShowDubsID_Unchecked(object sender, RoutedEventArgs e)
         {
-            if (MainWindow != null)
+            if (this.MainWindow != null)
             {
                 Parser.g_DeleteDublicatesIDs = true;
 
-                if (MainWindow.IsLoadDataGrid())
+                if (this.MainWindow.IsLoadDataGrid())
                 {
-                    MainWindow.RefreshMainGridAndSetCount();
+                    this.MainWindow.RefreshMainGridAndSetCount();
                 }
             }
         }
 
         private void ShowBlocksymbols_Checked(object sender, RoutedEventArgs e)
         {
-            if (MainWindow != null)
+            if (this.MainWindow != null)
             {
                 Parser.g_IgnoreBlockingSymbol = true;
 
-                if (MainWindow.IsLoadDataGrid())
+                if (this.MainWindow.IsLoadDataGrid())
                 {
-                    MainWindow.RefreshMainGridAndSetCount();
+                    this.MainWindow.RefreshMainGridAndSetCount();
                 }
             }
         }
 
         private void ShowBlocksymbols_Unchecked(object sender, RoutedEventArgs e)
         {
-            if (MainWindow != null)
+            if (this.MainWindow != null)
             {
                 Parser.g_IgnoreBlockingSymbol = false;
 
-                if (MainWindow.IsLoadDataGrid())
+                if (this.MainWindow.IsLoadDataGrid())
                 {
-                    MainWindow.RefreshMainGridAndSetCount();
+                    this.MainWindow.RefreshMainGridAndSetCount();
                 }
             }
         }
 
         private void ShowFemales_Checked(object sender, RoutedEventArgs e)
         {
-            if (MainWindow != null)
+            if (this.MainWindow != null)
             {
-                if (MainWindow.IsLoadDataGrid())
+                if (this.MainWindow.IsLoadDataGrid())
                 {
-                    MainWindow.MainDataGrid.Items.Refresh();
+                    this.MainWindow.MainDataGrid.Items.Refresh();
                 }
             }
         }
 
         private void ShowFemales_Unchecked(object sender, RoutedEventArgs e)
         {
-            if (MainWindow != null)
+            if (this.MainWindow != null)
             {
-                if (MainWindow.IsLoadDataGrid())
+                if (this.MainWindow.IsLoadDataGrid())
                 {
-                    MainWindow.MainDataGrid.Items.Refresh();
+                    this.MainWindow.MainDataGrid.Items.Refresh();
                 }
             }
         }
 
         private void FixMenus_Click(object sender, RoutedEventArgs e)
         {
-            if (MainWindow != null)
+            if (this.MainWindow != null)
             {
-                if (MainWindow.AskIfCatIsChanged("Всё равно продолжить?", "Продолжить?", MessageBoxImage.Question) == 0)
+                if (this.MainWindow.AskIfCatIsChanged("Всё равно продолжить?", "Продолжить?", MessageBoxImage.Question) == 0)
                     return;
 
-                MainWindow.CatIsChanged(false);
+                this.MainWindow.CatIsChanged(false);
 
-                FixMenusDialog(MainWindow.g_CurrentOriginalFile);
+                FixMenusDialog(this.MainWindow.g_CurrentOriginalFile);
             }
+        }
+
+        private async void CompMode_Click(object sender, RoutedEventArgs e)
+        {
+            if (this.MainWindow != null)
+            {
+                if (!this.g_CompareMode)
+                {
+                    if (MainWindow.AskIfCatIsChanged("Всё равно продолжить?", "Продолжить?", MessageBoxImage.Question) == 0)
+                    {
+                        e.Handled = true;
+
+                        this.CompMode.IsChecked = false;
+
+                        this.g_CompareMode = false;
+
+                        return;
+                    }
+
+                    this.g_OldCatsData = SaveAllCats();
+
+                    if (await MainWindow.ChooseOldModAndSeeDifference())
+                    {
+                        this.g_CompareMode = true;
+
+                        this.MainWindow.Title = MainWindow.Title + " (Режим сравнения) ";
+
+                        this.FixMenus.IsEnabled = false;
+
+                        this.MainWindow.RefreshMainGridAndSetCount();
+                    }
+                    else
+                    {
+                        this.g_CompareMode = false;
+
+                        this.CompMode.IsChecked = false;
+                    }
+                }
+                else if (this.g_CompareMode)
+                {
+                    var Ask = MessageBox.Show($"Выйти из режима сравнения?", "Вопрос", MessageBoxButton.YesNo, MessageBoxImage.Question);
+
+                    if (Ask == MessageBoxResult.No)
+                    {
+                        e.Handled = true;
+
+                        this.CompMode.IsChecked = true;
+
+                        return;
+                    }
+                    else if (Ask == MessageBoxResult.Yes)
+                    {
+                        this.MainWindow.Title = Settings.AppTitle;
+
+                        RestoreAllCats();
+
+                        this.g_CompareMode = false;
+
+                        this.FixMenus.IsEnabled = true;
+
+                        this.MainWindow.LoadCategoryFromFileBox(0);
+                    }                        
+                }
+            }
+        }
+
+        private List<WorkLoad.CatInfo> SaveAllCats()
+        {
+            var Result = new List<WorkLoad.CatInfo>();
+
+            foreach (var Cat in WorkLoad.GetBindings())
+            {
+                if (Cat.Rows != null) // Сохраняем только валидные категории
+                    Result.Add(Cat.Clone());
+            }
+            return Result;
+        }
+
+        private void RestoreAllCats()
+        {
+            var CatsName = new List<string>();
+
+            foreach (var Cat in this.g_OldCatsData)
+            {
+                var Category = WorkLoad.FindByCategory(Cat.Category);
+
+                if (Category == null)
+                    throw new Exception("Всё плохо. Не получилось восстановить данные категорий");
+
+                Category.CopyFrom(Cat);
+
+                CatsName.Add(Cat.Category);
+            }
+            this.MainWindow.SelectFilesBox.ItemsSource = CatsName;
         }
 
         private string GetNewBackupFileName(string FileName)
@@ -221,10 +322,11 @@ namespace ModTranslatorSettings
 
                     File.WriteAllText(MenuFilePath, NewMenuText);
 
-                    MainWindow.ProcessAndLoadSingleFile(MenuFilePath);
+                    this.MainWindow.ProcessAndLoadSingleFile(MenuFilePath);
                 }
             }
             return false;
         }
+
     }
 }

@@ -22,8 +22,10 @@
         <CheckBox x:Name="ImportOnlyInEmpty" Content="Импортировать только в пустые строки" ToolTip="Импортировать только непереведённые строки. По умолчанию импортируемый файл заменяет собой переведенные ранее строки."  HorizontalAlignment="Left" Margin="15,100,0,0" VerticalAlignment="Top" Width="251"/>
 
         <Button x:Name="FixMenus" Content="Испр. menus.txt" ToolTip="Использовать с острожностью. Перезаписывает все дубликаты id в оригинальном файле menus.txt" HorizontalAlignment="Left" Margin="15,260,0,0" Click="FixMenus_Click" Height="30" Width="100" VerticalAlignment="Top" IsEnabled="False"/>
-        
-        <CheckBox x:Name="ShowNPC" Content="Подсветить персонажей в таблице" ToolTip="Включает подсветку строк с женскими персонажами-людьми (розовый) и тех, кого невозможно определить однозначно (серый)"  HorizontalAlignment="Left" Margin="15,175,0,0" Width="220" Height="15" VerticalAlignment="Top" Checked="ShowFemales_Checked" Unchecked="ShowFemales_Unchecked" IsChecked="True"/>
+
+        <CheckBox x:Name="ShowNPC" Content="Подсветить персонажей в таблице" ToolTip="Включает подсветку строк в таблице там, где можно одназначно определить пол или того, к кому обращается игрок\нпс (не работает в режиме сравнения)"  HorizontalAlignment="Left" Margin="15,175,0,0" Width="220" Height="15" VerticalAlignment="Top" Checked="ShowFemales_Checked" Unchecked="ShowFemales_Unchecked" IsChecked="True"/>
+
+        <CheckBox x:Name="CompMode" Content="Режим сравнения версий" ToolTip="Выбрать старую версию мода для сравнения и вывести только те строки, которые были добавлены\изменены в текущем моде" HorizontalAlignment="Left" Margin="15,200,0,0" VerticalAlignment="Top" Click="CompMode_Click" Width="230"/>
 
     </Grid>
 </Window>

@@ -1478,9 +1478,12 @@ namespace WarbandParser
         /// <param name="NewRows">Новый перевод</param>
         /// <param name="OldRows">Старый перевод</param>
         /// <returns></returns>
-        public static List<ModTextRow> GetModTextChanges(List<ModTextRow> NewRows, List<ModTextRow> OldRows, StringComparison CompareType = StringComparison.OrdinalIgnoreCase)
+        public static List<ModTextRow> GetModTextChanges(List<ModTextRow> NewRows, List<ModTextRow>? OldRows, StringComparison CompareType = StringComparison.OrdinalIgnoreCase)
         {
             var Result = new List<ModTextRow>();
+
+            if (OldRows == null)
+                return NewRows;
 
             foreach (var RowData in NewRows)
             {
