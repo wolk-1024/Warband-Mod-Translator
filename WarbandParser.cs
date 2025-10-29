@@ -529,7 +529,7 @@ namespace WarbandParser
         }
         */
 
-        private static WhoTalking GetDialogueCondition(uint? DialogueFlags, List<ModTextRow>? TroopsList = null, List<ModTextRow>? PartyTempList = null)
+        private static WhoTalking GetDialogueCondition(uint? DialogueFlags, List<ModTextRow>? TroopsList, List<ModTextRow>? PartyTempList)
         {
             WhoTalking Result = new WhoTalking();
 
@@ -607,7 +607,7 @@ namespace WarbandParser
         /// <param name="TroopsList"></param>
         /// <param name="PartyTempList"></param>
         /// <returns></returns>
-        public static WhoTalking GetDialogueCondition(string DialogeLine, List<ModTextRow>? TroopsList = null, List<ModTextRow>? PartyTempList = null)
+        public static WhoTalking GetDialogueCondition(string DialogeLine, List<ModTextRow>? TroopsList, List<ModTextRow>? PartyTempList)
         {
             WhoTalking Result = new WhoTalking();
 
@@ -624,7 +624,7 @@ namespace WarbandParser
             return Result;
         }
 
-        private static DialogLine ParseDialogueLine(string DialogueLine)
+        private static DialogLine ParseDialogueLine(string DialogueLine, List<ModTextRow>? TroopsList, List<ModTextRow>? PartyTempList)
         {
             var Result = new DialogLine();
 
@@ -663,7 +663,7 @@ namespace WarbandParser
 
                                 Result.Text = AllParams[ResPos]; // Текст реплики.
 
-                                //Result.States = GetDialogueState(DualogueLine, TroopsList, PartyTempList);
+                                //Result.WhoIs = GetDialogueCondition(DialogueLine, TroopsList, PartyTempList);
                             }
                         }
                     }
@@ -672,7 +672,7 @@ namespace WarbandParser
             return Result;
         }
 
-        public static List<ModTextRow> LoadAndParseConversationFile(string FilePath)
+        public static List<ModTextRow> LoadAndParseConversationFile(string FilePath, List<ModTextRow>? TroopsList = null, List<ModTextRow>? PartyTempList = null)
         {
             var Result = new List<ModTextRow>();
 
@@ -687,7 +687,7 @@ namespace WarbandParser
                 {
                     // ID, Название, Название (мн.числ), 0, Флаги
 
-                    var DlgResult = ParseDialogueLine(Line);
+                    var DlgResult = ParseDialogueLine(Line, TroopsList, PartyTempList);
 
                     if (string.IsNullOrEmpty(DlgResult.ID) || string.IsNullOrEmpty(DlgResult.Text))
                     {
@@ -709,7 +709,7 @@ namespace WarbandParser
                     {
                         RowId        = DlgResult.ID,
                         OriginalText = DialogText,
-                        //Dialogue   = DlgResult.States,
+                        //Dialogue   = DlgResult.WhoIs,
                         Flags        = NewFlags,
                         RawLine      = Line,
                         DataPos      = (Line.Start, Line.End)

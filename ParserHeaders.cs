@@ -85,7 +85,7 @@
         public string ID = "PARSER_ERROR";
         public string Text = "PARSER_ERROR";
 
-        public WhoTalking? States = null;
+        public WhoTalking? WhoIs = null;
     }
 
     public class ParseArg

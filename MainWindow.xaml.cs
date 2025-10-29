@@ -97,9 +97,10 @@ namespace ModTranslator
         {
             public class CatInfo
             {
-                public string FileName   { get; set; } = string.Empty;
-                public string ExportName { get; set; } = string.Empty;
-                public string Category   { get; set; } = string.Empty;
+                public string FileName     { get; set; } = string.Empty;
+                public string FullFileName { get; set; } = string.Empty;
+                public string ExportName   { get; set; } = string.Empty;
+                public string Category     { get; set; } = string.Empty;
 
                 public bool IsChanged { get; set; } = false;
                 public List<ModTextRow>? Rows { get; set; } = null;
@@ -346,7 +347,7 @@ namespace ModTranslator
         /// <summary>
         /// 
         /// </summary>
-        private WorkLoad.CatInfo? GetCurrentMod()
+        public WorkLoad.CatInfo? GetCurrentMod()
         {
             var Bindings = MainDataGrid.ItemsSource as List<ModTextRow>;
 
@@ -354,6 +355,12 @@ namespace ModTranslator
                 return WorkLoad.GetBindings().Find(x => (x.Rows == Bindings));
 
             return null;
+        }
+
+        private static void SetBindFullPath(string FolderPath)
+        {
+            WorkLoad.GetBindings().ForEach(Bind =>
+                Bind.FullFileName = Path.Combine(FolderPath, Bind.FileName));
         }
 
         /// <summary>
@@ -1258,7 +1265,7 @@ namespace ModTranslator
         /// </summary>
         /// <param name="ModFolderPath"></param>
         /// <returns></returns>
-        private async Task<int> LoadModFilesAndCategories(string ModFolderPath)
+        private async Task<int> LoadModFilesAndCategories(string ModFolderPath, bool CompareMode = false)
         {
             var Result = -1;
 
@@ -1289,6 +1296,8 @@ namespace ModTranslator
                                 return -1;
                         }
                         ModFile.Rows = LoadedFile;
+
+                        ModFile.FullFileName = FullPath;
 
                         Categories.Add(ModFile.Category);
 
