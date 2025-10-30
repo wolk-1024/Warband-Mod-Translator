@@ -22,7 +22,7 @@ namespace ModTranslatorSettings
         /// <summary>
         /// 
         /// </summary>
-        private List<WorkLoad.CatInfo> g_OldCatsData = new List<WorkLoad.CatInfo>();
+        private List<WorkLoad.CatInfo>? g_OldCatsData = null;
 
         public bool g_CompareMode = false;
 
@@ -199,17 +199,27 @@ namespace ModTranslatorSettings
                     {
                         this.g_CompareMode = true;
 
-                        this.MainWindow.Title = MainWindow.Title + " (Режим сравнения) ";
+                        this.MainWindow.Title = "(Режим сравнения)";
 
                         this.FixMenus.IsEnabled = false;
+
+                        this.MainWindow.OpenModButton.IsEnabled = false;
 
                         this.MainWindow.RefreshMainGridAndSetCount();
                     }
                     else
                     {
+                        RestoreAllCats();
+
+                        this.g_OldCatsData = null;
+
                         this.g_CompareMode = false;
 
                         this.CompMode.IsChecked = false;
+
+                        this.MainWindow.Title = Settings.AppTitle;
+
+                        this.MainWindow.OpenModButton.IsEnabled = true;
                     }
                 }
                 else if (this.g_CompareMode)
@@ -226,13 +236,15 @@ namespace ModTranslatorSettings
                     }
                     else if (Ask == MessageBoxResult.Yes)
                     {
-                        this.MainWindow.Title = Settings.AppTitle;
-
                         RestoreAllCats();
 
                         this.g_CompareMode = false;
 
                         this.FixMenus.IsEnabled = true;
+
+                        this.MainWindow.Title = Settings.AppTitle;
+
+                        this.MainWindow.OpenModButton.IsEnabled = true;
 
                         this.MainWindow.LoadCategoryFromFileBox(0);
                     }                        
@@ -254,20 +266,23 @@ namespace ModTranslatorSettings
 
         private void RestoreAllCats()
         {
-            var CatsName = new List<string>();
-
-            foreach (var Cat in this.g_OldCatsData)
+            if (this.g_OldCatsData != null)
             {
-                var Category = WorkLoad.FindByCategory(Cat.Category);
+                var CatsName = new List<string>();
 
-                if (Category == null)
-                    throw new Exception("Всё плохо. Не получилось восстановить данные категорий");
+                foreach (var Cat in this.g_OldCatsData)
+                {
+                    var Category = WorkLoad.FindByCategory(Cat.Category);
 
-                Category.CopyFrom(Cat);
+                    if (Category == null)
+                        throw new Exception("Всё плохо. Не получилось восстановить данные категорий");
 
-                CatsName.Add(Cat.Category);
+                    Category.CopyFrom(Cat);
+
+                    CatsName.Add(Cat.Category);
+                }
+                this.MainWindow.SelectFilesBox.ItemsSource = CatsName;
             }
-            this.MainWindow.SelectFilesBox.ItemsSource = CatsName;
         }
 
         private string GetNewBackupFileName(string FileName)
@@ -322,7 +337,10 @@ namespace ModTranslatorSettings
 
                     File.WriteAllText(MenuFilePath, NewMenuText);
 
-                    this.MainWindow.ProcessAndLoadSingleFile(MenuFilePath);
+                    if (this.MainWindow.ProcessAndLoadSingleFile(MenuFilePath) == false)
+                    {
+                        MessageBox.Show("Что-то пошло не так...", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
                 }
             }
             return false;

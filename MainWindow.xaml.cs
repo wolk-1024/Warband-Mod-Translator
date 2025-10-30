@@ -1,26 +1,18 @@
 ﻿/*
  *  (c) wolk-1024
  *  
- *  Планы на релизную версию: 
+ *  Планы на версию v2: 
  * 
- *  Добавить работу с несколькими категориями одновременно, без перезагрузки таблицы. (важно)
- *  Исправить недостатки парсера.
+ *  Исправить недостатки парсера. (важно)
  *  Добавить локализацию на английский.
  *  Доработать режим сравнения.
  *  Доработать поиск.
- *  Добавить больше горячих клавиш для поиска.
  */
-using EncodingTextFile;
 using Microsoft.Win32;
-using ModTranslatorSettings;
-using System;
-using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
 using System.IO;
-using System.Linq;
 using System.Reflection;
-using System.Security.Policy;
 using System.Text;
 using System.Windows;
 using System.Windows.Controls;
@@ -31,7 +23,8 @@ using System.Windows.Media;
 using WarbandAbout;
 using WarbandParser;
 using WarbandSearch;
-using static System.Net.Mime.MediaTypeNames;
+using ModTranslatorSettings;
+using EncodingTextFile;
 
 //#nullable disable
 
@@ -125,6 +118,7 @@ namespace ModTranslator
                 public string FullFileName    { get; set; } = string.Empty;
                 public string ExportName      { get; set; } = string.Empty;
                 public string Category        { get; set; } = string.Empty;
+
                 public bool IsChanged         { get; set; } = false;
                 public List<ModTextRow>? Rows { get; set; } = null;
             }
@@ -189,6 +183,8 @@ namespace ModTranslator
         {
             public int LoadedRows = 0;
             public int LoadedCats = 0;
+
+            public bool IsError   = false;
         }
 
         /// <summary>
@@ -362,7 +358,7 @@ namespace ModTranslator
 
         public bool IsLoadDataGrid()
         {
-            return (this.MainDataGrid.Items.Count > 0 && File.Exists(g_CurrentOriginalFile));
+            return (this.MainDataGrid.Items.Count > 0);
         }
 
         /// <summary>
@@ -378,18 +374,33 @@ namespace ModTranslator
             return new List<ModTextRow>();
         }
 
+        private void ClearCatsRows()
+        {
+            foreach (var Items in WorkLoad.GetBindings())
+            {
+                Items.Rows = null;
+                Items.IsChanged = false;
+            }
+        }
+
         /// <summary>
-        /// Fixme: ищет по ссылке. Если сменить на другую, то вернет null
         /// Возвращает структуру связанную с текущей в таблице.
         /// </summary>
         public WorkLoad.CatInfo? GetCurrentBinding()
         {
+            /*
             var Bindings = this.MainDataGrid.ItemsSource as List<ModTextRow>;
 
             if (Bindings != null)
                 return WorkLoad.GetBindings().Find(x => (x.Rows == Bindings));
+            */
 
-            return null;
+            var CurrentCat = this.SelectFilesBox.SelectedItem;
+
+            if (CurrentCat != null)
+                return WorkLoad.FindByCategory(CurrentCat.ToString() ?? "");
+            else
+                return null;
         }
 
         private static void SetBindFullPath(string FolderPath)
@@ -1324,16 +1335,18 @@ namespace ModTranslator
         /// </summary>
         /// <param name="ModFolderPath"></param>
         /// <returns></returns>
-        private async Task<LoadedResult> LoadModFilesAndCategories(string ModFolderPath, bool CompareMode = false)
+        private async Task<LoadedResult> LoadModFilesAndCategories(string ModFolderPath, bool CompareMode)
         {
-            var Result = new LoadedResult();
+            var Result = new LoadedResult { IsError = false };
 
             string FullPath = "nofile";
+
+            int FoundedFiles = 0;
 
             try
             {
                 if (!Directory.Exists(ModFolderPath))
-                    return new LoadedResult();
+                    return new LoadedResult { IsError = true };
 
                 var Categories = new List<string> { };
 
@@ -1343,7 +1356,9 @@ namespace ModTranslator
 
                     if (File.Exists(FullPath))
                     {
-                        var LoadedFile = await Task.Run(() => ProcessOriginalFiles(FullPath));
+                        FoundedFiles++;
+
+                        var LoadedFile = await Task.Run(() => ProcessOriginalFiles(FullPath)); // Fixme: надо нормально распаралелить на задачи, а не так.
 
                         if (LoadedFile == null)
                         {
@@ -1352,19 +1367,21 @@ namespace ModTranslator
                             if (Ask == MessageBoxResult.Yes)
                                 continue;
                             else
-                                return new LoadedResult();
+                                return new LoadedResult { IsError = true };
                         }
 
                         if (CompareMode)
-                            LoadedFile = Parser.GetModTextChanges(LoadedFile, ModFile.Rows); // Исправить код надо. Плохо работает с дубликатами.
+                        {
+                            LoadedFile = Parser.GetNewOrModifiedRows(ModFile.Rows, LoadedFile);
+                        }
 
                         if (LoadedFile.Count > 0)
                         {
                             Result.LoadedCats++;
 
-                            ModFile.Rows = LoadedFile;
-
                             Result.LoadedRows += LoadedFile.Count;
+
+                            ModFile.Rows = LoadedFile;
 
                             ModFile.FullFileName = FullPath;
 
@@ -1372,29 +1389,33 @@ namespace ModTranslator
                         }
                     }
                 }
-                if (Result.LoadedCats > 0)
+
+                if (FoundedFiles == 0) // Ни одного файла не найдено
+                {
+                    return new LoadedResult { IsError = true }; // ошибка
+                }
+                else if (!CompareMode && Result.LoadedCats > 0) // Если не сравнение и есть загруженные категории.
                 {
                     AllCatsIsChanged(false);
 
-                    if (!CompareMode)
-                        PrepareCategoriesForTable(); // При сравнении некоректно будет работать.
+                    PrepareCategoriesForTable(); // При сравнении некоректно будет работать в диалогах
 
-                    this.SelectFilesBox.ItemsSource = Categories;
-
-                    this.SelectFilesBox.Items.Refresh();
-
-                    this.SelectFilesBox.SelectedIndex = 0;
+                    UpdateSelectFilesBox(Categories);
+                }
+                else if (!CompareMode && Result.LoadedCats == 0) // Если не сравнение и ничего нет, то
+                {
+                    return new LoadedResult { IsError = true }; // ошибка
+                }
+                else if (CompareMode && Result.LoadedCats == 0) // Если режим сравнения, но ничего нет, то значит всё идентично
+                {
+                    UpdateSelectFilesBox(null); 
                 }
             }
             catch (Exception)
             {
-                MessageBox.Show(
-                    $"При обработке: {FullPath} произошла критическая ошибка.",
-                    "Ошибка",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Stop);
+                MessageBox.Show($"При обработке: {FullPath} произошла критическая ошибка.", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Stop);
 
-                return new LoadedResult();
+                return new LoadedResult { IsError = true };
             }
             return Result;
         }
@@ -1436,7 +1457,7 @@ namespace ModTranslator
         {
             if (CategoryIndex <= this.SelectFilesBox.Items.Count)
             {
-                var SelectedCategory = this.SelectFilesBox.Items[CategoryIndex].ToString();
+                var SelectedCategory = this.SelectFilesBox.Items[CategoryIndex].ToString(); // Тут может быть краш
 
                 if (!string.IsNullOrEmpty(SelectedCategory))
                 {
@@ -1463,23 +1484,23 @@ namespace ModTranslator
         {
             var SelectedCategory = this.SelectFilesBox.SelectedValue?.ToString();
 
-            if (string.IsNullOrEmpty(SelectedCategory))
-                return;
-
-            var LoadedFile = WorkLoad.FindByCategory(SelectedCategory);
-
-            if (LoadedFile != null)
+            if (!string.IsNullOrEmpty(SelectedCategory)) // Если не пустое.
             {
-                this.g_FileForExport = Path.Combine(this.g_ModFolderPath + "\\languages\\" + LoadedFile.ExportName);
+                var LoadedFile = WorkLoad.FindByCategory(SelectedCategory);
 
-                if (LoadedFile.Rows != null)
+                if (LoadedFile != null)
                 {
-                    this.g_CurrentOriginalFile = Path.Combine(this.g_ModFolderPath, LoadedFile.FileName);
+                    this.g_FileForExport = Path.Combine(this.g_ModFolderPath + "\\languages\\" + LoadedFile.ExportName);
 
-                    RefreshMainGridAndSetCount(LoadedFile.Rows);
+                    if (LoadedFile.Rows != null)
+                    {
+                        this.g_CurrentOriginalFile = Path.Combine(this.g_ModFolderPath, LoadedFile.FileName);
+
+                        RefreshMainGridAndSetCount(LoadedFile.Rows);
+                    }
                 }
+                ActionAfterSelectionChanged();
             }
-            ActionAfterSelectionChanged();
         }
 
         private void ActionAfterSelectionChanged()
@@ -1503,15 +1524,21 @@ namespace ModTranslator
             }
         }
 
+        /// <summary>
+        /// Обновление списка в SelectFilesBox
+        /// </summary>
+        private void UpdateSelectFilesBox(List<string>? Cats)
+        {
+            this.SelectFilesBox.ItemsSource = Cats;
+
+            this.SelectFilesBox.Items.Refresh();
+
+            this.SelectFilesBox.SelectedIndex = 0;
+        }
+
         private async void OpenModButton_Click(object sender, RoutedEventArgs e)
         {
-            this.g_OptionsWindow.CompMode.IsChecked = false;
-
-            this.g_OptionsWindow.g_CompareMode = false;
-
             var FolderDialog = new OpenFolderDialog();
-
-            //FolderDialog.InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
 
             FolderDialog.Title = "Выбрать папку с установленным модом";
 
@@ -1519,11 +1546,19 @@ namespace ModTranslator
 
             if (FolderDialog.ShowDialog() == true)
             {
-                this.g_FileForExport  = string.Empty;
+                this.Title = Settings.AppTitle;
 
-                this.g_ModFolderPath  = FolderDialog.FolderName;
+                this.g_OptionsWindow.g_CompareMode = false;
 
-                if ((await LoadModFilesAndCategories(FolderDialog.FolderName)).LoadedCats == 0)
+                this.g_OptionsWindow.CompMode.IsChecked = false;
+
+                this.g_FileForExport = string.Empty;
+
+                this.g_ModFolderPath = FolderDialog.FolderName;
+
+                ClearCatsRows();
+
+                if ((await LoadModFilesAndCategories(FolderDialog.FolderName, false)).IsError == true)
                 {
                     MessageBox.Show("Неверный мод.", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
 
@@ -1554,9 +1589,6 @@ namespace ModTranslator
         private async void ImportButton_Click(object sender, RoutedEventArgs e)
         {
             if (!IsLoadDataGrid())
-                return;
-
-            if (this.g_OptionsWindow == null)
                 return;
 
             var DialogFile = new OpenFileDialog();
@@ -1615,7 +1647,7 @@ namespace ModTranslator
 
                     AllCatsIsChanged(false);
 
-                    if ((await LoadModFilesAndCategories(ModPathText.Text)).LoadedCats > 0)
+                    if ((await LoadModFilesAndCategories(ModPathText.Text, false)).IsError == false)
                     {
                         this.g_ModFolderPath = ModPathText.Text;
 
@@ -1623,6 +1655,9 @@ namespace ModTranslator
 
                         EnableControlElements();
                     }
+                    else
+                        MessageBox.Show("Неверный мод.", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+
                 }
             }
         }
@@ -1672,7 +1707,7 @@ namespace ModTranslator
 
         public async Task<bool> ChooseOldModAndSeeDifference()
         {
-            if (IsLoadDataGrid())
+            //if (IsLoadDataGrid())
             {
                 var FolderDialog = new OpenFolderDialog();
 
@@ -1687,7 +1722,7 @@ namespace ModTranslator
                 {
                     var LoadResult = await LoadModFilesAndCategories(FolderDialog.FolderName, true);
 
-                    if (LoadResult.LoadedCats == 0)
+                    if (LoadResult.IsError == true)
                     {
                         MessageBox.Show($"Неверный мод {FolderDialog.FolderName}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
 

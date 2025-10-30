@@ -1472,13 +1472,14 @@ namespace WarbandParser
             return Result;
         }
 
+        /*
         /// <summary>
         /// Возвращает разницу между новым и старым списком переводов.
         /// </summary>
         /// <param name="NewRows">Новый перевод</param>
         /// <param name="OldRows">Старый перевод</param>
         /// <returns></returns>
-        public static List<ModTextRow> GetModTextChanges(List<ModTextRow> NewRows, List<ModTextRow>? OldRows, StringComparison CompareType = StringComparison.OrdinalIgnoreCase)
+        public static List<ModTextRow> GetModTextChange(List<ModTextRow> NewRows, List<ModTextRow>? OldRows, StringComparison CompareType = StringComparison.OrdinalIgnoreCase)
         {
             var Result = new List<ModTextRow>();
 
@@ -1499,6 +1500,37 @@ namespace WarbandParser
                     {
                         Result.Add(RowData); // Если отличаются, то добавляем.
                     }
+                }
+            }
+            return Result;
+        }
+        */
+
+        public static List<ModTextRow> GetNewOrModifiedRows(List<ModTextRow>? OldRows, List<ModTextRow> NewRows, StringComparison CompareType = StringComparison.OrdinalIgnoreCase)
+        {
+            if (OldRows == null)
+                return NewRows;
+
+            var Result = new List<ModTextRow>();
+
+            var Lookup = NewRows.ToLookup(x => x.RowId);
+
+            foreach (var Row in OldRows)
+            {
+                var MatchingRows = Lookup[Row.RowId];
+
+                if (!MatchingRows.Any())
+                {
+                    Result.Add(Row);
+
+                    continue;
+                }
+
+                bool FoundMatch = MatchingRows.Any(Row2 => string.Equals(Row2.OriginalText, Row.OriginalText, CompareType));
+
+                if (!FoundMatch)
+                {
+                    Result.Add(Row);
                 }
             }
             return Result;

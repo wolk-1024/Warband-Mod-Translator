@@ -27,5 +27,10 @@ namespace WarbandAbout
         {
             this.Close();
         }
+
+        private void AboutText_TextChanged(object sender, TextChangedEventArgs e)
+        {
+
+        }
     }
 }
