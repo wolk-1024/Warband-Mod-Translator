@@ -95,10 +95,10 @@ namespace ModTranslator
                 {
                     return new CatInfo
                     {
-                        FileName     = FileName,
-                        FullFileName = FullFileName,
-                        ExportName   = ExportName,
-                        Category     = Category,
+                        FileName     = new string(FileName),
+                        FullFileName = new string(FullFileName),
+                        ExportName   = new string(ExportName),
+                        Category     = new string(Category),
                         IsChanged    = IsChanged,
                         Rows         = Rows?.ToList()
                     };
@@ -198,14 +198,9 @@ namespace ModTranslator
         public string g_CurrentOriginalFile = string.Empty;
 
         /// <summary>
-        /// Режим сравнения версий.
-        /// </summary>
-        //public bool g_CompareMode = false;
-
-        /// <summary>
         /// // Путь к .csv переводу.
         /// </summary>
-        public string g_FileForExport = string.Empty;
+        //public string g_FileForExport = string.Empty;
 
         /// <summary>
         /// Значение текущей выделенной ячейки. (Только ячейка из столбца перевода)
@@ -1071,7 +1066,7 @@ namespace ModTranslator
             }
         }
 
-        private string GetTranslateFileNameFromFileBox()
+        private string GetExportNameFromFileBox()
         {
             var SelectedCategory = this.SelectFilesBox.SelectedValue.ToString();
 
@@ -1101,7 +1096,7 @@ namespace ModTranslator
             var CsvName = SaveTo;
 
             if (string.IsNullOrEmpty(CsvName))
-                CsvName = Path.GetFileName(this.g_FileForExport);
+                CsvName = GetExportNameFromFileBox();
 
             if (this.g_OptionsWindow.CompMode.IsChecked ?? false) // По умолчанию выкл.
                 FileDialog.FileName = "new_" + CsvName;
@@ -1127,8 +1122,6 @@ namespace ModTranslator
                 ExportModTextToFile(FileDialog.FileName, (bool)EmptyExport);
 
                 CatIsChanged(false);
-
-                this.g_FileForExport = FileDialog.FileName;
             }
         }
 
@@ -1339,14 +1332,16 @@ namespace ModTranslator
         {
             var Result = new LoadedResult { IsError = false };
 
+            if (!Directory.Exists(ModFolderPath))
+                return new LoadedResult { IsError = true };
+
             string FullPath = "nofile";
 
             int FoundedFiles = 0;
 
             try
             {
-                if (!Directory.Exists(ModFolderPath))
-                    return new LoadedResult { IsError = true };
+                //ClearCatsRows();
 
                 var Categories = new List<string> { };
 
@@ -1490,8 +1485,6 @@ namespace ModTranslator
 
                 if (LoadedFile != null)
                 {
-                    this.g_FileForExport = Path.Combine(this.g_ModFolderPath + "\\languages\\" + LoadedFile.ExportName);
-
                     if (LoadedFile.Rows != null)
                     {
                         this.g_CurrentOriginalFile = Path.Combine(this.g_ModFolderPath, LoadedFile.FileName);
@@ -1552,15 +1545,15 @@ namespace ModTranslator
 
                 this.g_OptionsWindow.CompMode.IsChecked = false;
 
-                this.g_FileForExport = string.Empty;
-
                 this.g_ModFolderPath = FolderDialog.FolderName;
 
-                ClearCatsRows();
+                var SavedCats = SaveAllCats();
 
                 if ((await LoadModFilesAndCategories(FolderDialog.FolderName, false)).IsError == true)
                 {
                     MessageBox.Show("Неверный мод.", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+
+                    RestoreAllCats(SavedCats);
 
                     return;
                 }
@@ -1568,6 +1561,8 @@ namespace ModTranslator
                 if (!LoadCategoryFromFileBox(0))
                 {
                     MessageBox.Show("Ошибка загрузки категории.", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+
+                    RestoreAllCats(SavedCats);
 
                     return;
                 }
@@ -1597,7 +1592,7 @@ namespace ModTranslator
 
             DialogFile.Filter = "CSV файлы|*.csv|Текстовые файлы|*.txt|Все файлы|*.*";
 
-            DialogFile.FileName = GetTranslateFileNameFromFileBox();
+            DialogFile.FileName = GetExportNameFromFileBox();
 
             var SourceDirectory = this.g_ModFolderPath + "\\languages";
 
@@ -1707,32 +1702,29 @@ namespace ModTranslator
 
         public async Task<bool> ChooseOldModAndSeeDifference()
         {
-            //if (IsLoadDataGrid())
+            var FolderDialog = new OpenFolderDialog();
+
+            FolderDialog.Title = "Выбрать папку со старой версией мода";
+
+            FolderDialog.Multiselect = false;
+
+            if (Directory.Exists(this.g_ModFolderPath))
+                FolderDialog.InitialDirectory = this.g_ModFolderPath;
+
+            if (FolderDialog.ShowDialog() == true)
             {
-                var FolderDialog = new OpenFolderDialog();
+                var LoadResult = await LoadModFilesAndCategories(FolderDialog.FolderName, true);
 
-                FolderDialog.Title = "Выбрать папку со старой версией мода";
-
-                FolderDialog.Multiselect = false;
-
-                if (Directory.Exists(this.g_ModFolderPath))
-                    FolderDialog.InitialDirectory = this.g_ModFolderPath;
-
-                if (FolderDialog.ShowDialog() == true)
+                if (LoadResult.IsError == true)
                 {
-                    var LoadResult = await LoadModFilesAndCategories(FolderDialog.FolderName, true);
+                    MessageBox.Show($"Неверный мод {FolderDialog.FolderName}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
 
-                    if (LoadResult.IsError == true)
-                    {
-                        MessageBox.Show($"Неверный мод {FolderDialog.FolderName}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
-
-                        return false;
-                    }
-
-                    MessageBox.Show($"Всего было изменено или добавлено: {LoadResult.LoadedRows} строк в {LoadResult.LoadedCats} категориях", "Сравнение", MessageBoxButton.OK, MessageBoxImage.Information);
-
-                    return true;
+                    return false;
                 }
+
+                MessageBox.Show($"Всего было изменено или добавлено: {LoadResult.LoadedRows} строк в {LoadResult.LoadedCats} категориях", "Сравнение", MessageBoxButton.OK, MessageBoxImage.Information);
+
+                return true;
             }
             return false;
         }
@@ -2294,6 +2286,39 @@ namespace ModTranslator
                     }
                 }
             });
+        }
+
+        public List<WorkLoad.CatInfo> SaveAllCats()
+        {
+            var Result = new List<WorkLoad.CatInfo>();
+
+            foreach (var Cat in WorkLoad.GetBindings())
+            {
+                if (Cat.Rows != null)
+                    Result.Add(Cat.Clone());
+            }
+            return Result;
+        }
+
+        public void RestoreAllCats(List<WorkLoad.CatInfo>? CatsList)
+        {
+            if (CatsList != null)
+            {
+                var CatsName = new List<string>();
+
+                foreach (var Cat in CatsList)
+                {
+                    var Category = WorkLoad.FindByCategory(Cat.Category);
+
+                    if (Category == null)
+                        throw new Exception("Всё плохо. Не получилось восстановить данные категорий");
+
+                    Category.CopyFrom(Cat);
+
+                    CatsName.Add(Cat.Category);
+                }
+                this.SelectFilesBox.ItemsSource = CatsName;
+            }
         }
 
     }

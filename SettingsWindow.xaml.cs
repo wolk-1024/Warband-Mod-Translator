@@ -22,7 +22,7 @@ namespace ModTranslatorSettings
         /// <summary>
         /// 
         /// </summary>
-        private List<WorkLoad.CatInfo>? g_OldCatsData = null;
+        public List<WorkLoad.CatInfo>? g_OldCatsData = null;
 
         public bool g_CompareMode = false;
 
@@ -193,7 +193,7 @@ namespace ModTranslatorSettings
                         return;
                     }
 
-                    this.g_OldCatsData = SaveAllCats();
+                    this.g_OldCatsData = this.MainWindow.SaveAllCats();
 
                     if (await MainWindow.ChooseOldModAndSeeDifference())
                     {
@@ -209,7 +209,7 @@ namespace ModTranslatorSettings
                     }
                     else
                     {
-                        RestoreAllCats();
+                        this.MainWindow.RestoreAllCats(this.g_OldCatsData);
 
                         this.g_OldCatsData = null;
 
@@ -236,7 +236,7 @@ namespace ModTranslatorSettings
                     }
                     else if (Ask == MessageBoxResult.Yes)
                     {
-                        RestoreAllCats();
+                        this.MainWindow.RestoreAllCats(this.g_OldCatsData);
 
                         this.g_CompareMode = false;
 
@@ -249,39 +249,6 @@ namespace ModTranslatorSettings
                         this.MainWindow.LoadCategoryFromFileBox(0);
                     }                        
                 }
-            }
-        }
-
-        private List<WorkLoad.CatInfo> SaveAllCats()
-        {
-            var Result = new List<WorkLoad.CatInfo>();
-
-            foreach (var Cat in WorkLoad.GetBindings())
-            {
-                if (Cat.Rows != null) // Сохраняем только валидные категории
-                    Result.Add(Cat.Clone());
-            }
-            return Result;
-        }
-
-        private void RestoreAllCats()
-        {
-            if (this.g_OldCatsData != null)
-            {
-                var CatsName = new List<string>();
-
-                foreach (var Cat in this.g_OldCatsData)
-                {
-                    var Category = WorkLoad.FindByCategory(Cat.Category);
-
-                    if (Category == null)
-                        throw new Exception("Всё плохо. Не получилось восстановить данные категорий");
-
-                    Category.CopyFrom(Cat);
-
-                    CatsName.Add(Cat.Category);
-                }
-                this.MainWindow.SelectFilesBox.ItemsSource = CatsName;
             }
         }
 
