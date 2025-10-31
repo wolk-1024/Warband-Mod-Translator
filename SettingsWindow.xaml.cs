@@ -193,7 +193,7 @@ namespace ModTranslatorSettings
                         return;
                     }
 
-                    this.g_OldCatsData = this.MainWindow.SaveAllCats();
+                    this.g_OldCatsData = WorkLoad.SaveAll();
 
                     if (await MainWindow.ChooseOldModAndSeeDifference())
                     {
@@ -209,7 +209,7 @@ namespace ModTranslatorSettings
                     }
                     else
                     {
-                        this.MainWindow.RestoreAllCats(this.g_OldCatsData);
+                        WorkLoad.RestoreAll(this.g_OldCatsData, this.MainWindow.SelectFilesBox);
 
                         this.g_OldCatsData = null;
 
@@ -236,7 +236,7 @@ namespace ModTranslatorSettings
                     }
                     else if (Ask == MessageBoxResult.Yes)
                     {
-                        this.MainWindow.RestoreAllCats(this.g_OldCatsData);
+                        WorkLoad.RestoreAll(this.g_OldCatsData, this.MainWindow.SelectFilesBox);
 
                         this.g_CompareMode = false;
 

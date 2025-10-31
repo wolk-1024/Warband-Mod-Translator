@@ -67,7 +67,7 @@ namespace WarbandSearch
             if (CheckFullSearch.IsChecked != null && CheckFullSearch.IsChecked == true)
                 FullSearch = true;
 
-            var Result = MainWindow.FindCellByString(MainWindow.MainDataGrid, SearchTextBox.Text, StartRow, FullSearch, true);
+            var Result = MainWindow.FindCellByString(MainWindow.MainDataGrid, SearchTextBox.Text, StartRow, FullSearch, true, StringComparison.OrdinalIgnoreCase);
 
             if (Result.ColumnIndex >= 0 || Result.RowIndex >= 0)
             {

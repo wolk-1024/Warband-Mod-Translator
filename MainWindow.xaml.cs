@@ -23,8 +23,8 @@ using System.Windows.Media;
 using WarbandAbout;
 using WarbandParser;
 using WarbandSearch;
-using ModTranslatorSettings;
 using EncodingTextFile;
+using ModTranslatorSettings;
 
 //#nullable disable
 
@@ -151,7 +151,7 @@ namespace ModTranslator
 
             public static CatInfo? FindByFile(string FileName, StringComparison Compare = StringComparison.OrdinalIgnoreCase)
             {
-                return BindingsList.FirstOrDefault(x => (x != null) && string.Equals(x.Category, FileName, Compare), null);
+                return BindingsList.FirstOrDefault(x => (x != null) && string.Equals(x.FileName, FileName, Compare), null);
             }
 
             /// <summary>
@@ -162,19 +162,89 @@ namespace ModTranslator
                 return BindingsList.FirstOrDefault(bind => bind.Rows != null && bind.Rows.Any(row => row.RowId.StartsWith(Prefix)));
             }
 
+            /// <summary>
+            /// Вернет список имен измененных категорий.
+            /// </summary>
             public static List<string> GetChangedCategories()
             {
                 return BindingsList.Where(x => x.IsChanged).Select(x => x.Category).ToList();
             }
 
+            /// <summary>
+            /// Вернет список измененных категорий.
+            /// </summary>
             public static List<CatInfo> GetChangedModInfo()
             {
                 return BindingsList.Where(x => x.IsChanged).ToList();
             }
 
+            /// <summary>
+            /// Биндинги
+            /// </summary>
             public static List<CatInfo> GetBindings() 
             {
                 return BindingsList; 
+            }
+
+            /// <summary>
+            /// Сохранить все категории, чьи Rows != null
+            /// </summary>
+            public static List<CatInfo> SaveAll()
+            {
+                var Result = new List<WorkLoad.CatInfo>();
+
+                foreach (var Cat in WorkLoad.GetBindings())
+                {
+                    if (Cat.Rows != null)
+                        Result.Add(Cat.Clone());
+                }
+                return Result;
+            }
+
+            /// <summary>
+            /// Восстановить сохраненные данные в таблицу.
+            /// </summary>
+            /// <param name="CatsList">Сюда результат SaveAll</param>
+            /// <exception cref="Exception"></exception>
+            public static void RestoreAll(List<WorkLoad.CatInfo>? CatsList, ComboBox Box)
+            {
+                if (CatsList != null)
+                {
+                    var CatsName = new List<string>();
+
+                    foreach (var Cat in CatsList)
+                    {
+                        var Category = WorkLoad.FindByCategory(Cat.Category);
+
+                        if (Category == null)
+                            throw new Exception("Всё плохо. Не получилось восстановить данные категорий");
+
+                        Category.CopyFrom(Cat);
+
+                        CatsName.Add(Cat.Category);
+                    }
+
+                    UpdateSelectFilesBox(CatsName, Box);
+                }
+            }
+
+            public static void ClearAll()
+            {
+                foreach (var Items in WorkLoad.GetBindings())
+                {
+                    Items.Rows = null;
+                    Items.IsChanged = false;
+                }
+            }
+
+            public static WorkLoad.CatInfo? FirstCat()
+            {
+                foreach (var Cat in WorkLoad.GetBindings())
+                {
+                    if (Cat.Rows != null)
+                        return Cat;
+                }
+                return null;
             }
 
         }
@@ -369,27 +439,11 @@ namespace ModTranslator
             return new List<ModTextRow>();
         }
 
-        private void ClearCatsRows()
-        {
-            foreach (var Items in WorkLoad.GetBindings())
-            {
-                Items.Rows = null;
-                Items.IsChanged = false;
-            }
-        }
-
         /// <summary>
         /// Возвращает структуру связанную с текущей в таблице.
         /// </summary>
         public WorkLoad.CatInfo? GetCurrentBinding()
         {
-            /*
-            var Bindings = this.MainDataGrid.ItemsSource as List<ModTextRow>;
-
-            if (Bindings != null)
-                return WorkLoad.GetBindings().Find(x => (x.Rows == Bindings));
-            */
-
             var CurrentCat = this.SelectFilesBox.SelectedItem;
 
             if (CurrentCat != null)
@@ -1328,7 +1382,7 @@ namespace ModTranslator
         /// </summary>
         /// <param name="ModFolderPath"></param>
         /// <returns></returns>
-        private async Task<LoadedResult> LoadModFilesAndCategories(string ModFolderPath, bool CompareMode)
+        private async Task<LoadedResult> LoadModFilesAndCategories(string ModFolderPath)
         {
             var Result = new LoadedResult { IsError = false };
 
@@ -1341,7 +1395,7 @@ namespace ModTranslator
 
             try
             {
-                //ClearCatsRows();
+                WorkLoad.ClearAll();
 
                 var Categories = new List<string> { };
 
@@ -1365,11 +1419,6 @@ namespace ModTranslator
                                 return new LoadedResult { IsError = true };
                         }
 
-                        if (CompareMode)
-                        {
-                            LoadedFile = Parser.GetNewOrModifiedRows(ModFile.Rows, LoadedFile);
-                        }
-
                         if (LoadedFile.Count > 0)
                         {
                             Result.LoadedCats++;
@@ -1385,26 +1434,17 @@ namespace ModTranslator
                     }
                 }
 
-                if (FoundedFiles == 0) // Ни одного файла не найдено
-                {
-                    return new LoadedResult { IsError = true }; // ошибка
-                }
-                else if (!CompareMode && Result.LoadedCats > 0) // Если не сравнение и есть загруженные категории.
+                if (FoundedFiles > 0 && Result.LoadedCats > 0)
                 {
                     AllCatsIsChanged(false);
 
-                    PrepareCategoriesForTable(); // При сравнении некоректно будет работать в диалогах
+                    if (this.g_OptionsWindow.g_CompareMode == false) // В режиме сравнения будет некорректно подсвечивать.
+                        PrepareCategoriesForTable();
 
-                    UpdateSelectFilesBox(Categories);
+                    UpdateSelectFilesBox(Categories, this.SelectFilesBox);
                 }
-                else if (!CompareMode && Result.LoadedCats == 0) // Если не сравнение и ничего нет, то
-                {
-                    return new LoadedResult { IsError = true }; // ошибка
-                }
-                else if (CompareMode && Result.LoadedCats == 0) // Если режим сравнения, но ничего нет, то значит всё идентично
-                {
-                    UpdateSelectFilesBox(null); 
-                }
+                else
+                    return new LoadedResult { IsError = true };
             }
             catch (Exception)
             {
@@ -1413,6 +1453,62 @@ namespace ModTranslator
                 return new LoadedResult { IsError = true };
             }
             return Result;
+        }
+
+        private async Task<LoadedResult> LoadModFilesAndCompare(string ModFolderPath)
+        {
+            var Result = new LoadedResult();
+
+            if (Directory.Exists(ModFolderPath))
+            {
+                var NewCategories = new List<WorkLoad.CatInfo>();
+
+                var SavedCats = WorkLoad.SaveAll(); // Сохраняем старую таблицу.
+
+                var LoadedMod = await LoadModFilesAndCategories(ModFolderPath); // Загружаем в таблицу новые данные
+
+                if (LoadedMod.IsError == true)
+                {
+                    WorkLoad.RestoreAll(SavedCats, this.SelectFilesBox);
+
+                    return new LoadedResult() { IsError = true }; // ошибка
+                }
+
+                foreach (var OldCat in SavedCats) // Перебираем сохраненные категории.
+                {
+                    var NewCats = WorkLoad.FindByFile(OldCat.FileName); // Ищем в биндингах сохраненную категорию.
+
+                    if (NewCats == null) // Если нет её, то
+                    {
+                        WorkLoad.RestoreAll(SavedCats, this.SelectFilesBox); // восстанавливаем старую таблицу и
+
+                        return new LoadedResult() { IsError = true }; // выходим с ошибкой.
+                    }
+
+                    var ModifiedRows = Parser.GetNewOrModifiedRows(OldCat.Rows, NewCats.Rows ?? new List<ModTextRow>());
+
+                    if (ModifiedRows.Count > 0)
+                    {
+                        Result.LoadedCats++;
+
+                        Result.LoadedRows += ModifiedRows.Count;
+
+                        NewCategories.Add(new WorkLoad.CatInfo
+                        {
+                            Rows         = ModifiedRows,
+                            Category     = NewCats.Category,
+                            FileName     = NewCats.FileName,
+                            FullFileName = NewCats.FullFileName,
+                            ExportName   = NewCats.ExportName,
+                            IsChanged    = false
+                        });
+                    }
+                }
+                WorkLoad.RestoreAll(NewCategories, this.SelectFilesBox);
+
+                return Result;
+            }
+            return new LoadedResult() { IsError = true };
         }
 
         /// <summary>
@@ -1450,27 +1546,39 @@ namespace ModTranslator
         /// </summary>
         public bool LoadCategoryFromFileBox(int CategoryIndex)
         {
-            if (CategoryIndex <= this.SelectFilesBox.Items.Count)
+            try
             {
-                var SelectedCategory = this.SelectFilesBox.Items[CategoryIndex].ToString(); // Тут может быть краш
-
-                if (!string.IsNullOrEmpty(SelectedCategory))
+                if (CategoryIndex <= this.SelectFilesBox.Items.Count)
                 {
-                    var LoadedFile = WorkLoad.FindByCategory(SelectedCategory);
+                    var SelectedCategory = this.SelectFilesBox.Items[CategoryIndex].ToString(); // Тут может быть краш
 
-                    if (LoadedFile == null || LoadedFile.Rows == null)
+                    if (!string.IsNullOrEmpty(SelectedCategory))
                     {
-                        MessageBox.Show($"Не найдена категория {SelectedCategory}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                        var LoadedFile = WorkLoad.FindByCategory(SelectedCategory);
 
-                        return false;
+                        if (LoadedFile == null || LoadedFile.Rows == null)
+                        {
+                            MessageBox.Show($"Не найдена категория {SelectedCategory}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+
+                            return false;
+                        }
+                        if (this.SelectFilesBox.SelectedIndex != CategoryIndex)
+                            this.SelectFilesBox.SelectedIndex = CategoryIndex; // Вызовет SelectFilesBox_SelectionChanged
+                        else
+                            RefreshMainGridAndSetCount(LoadedFile.Rows);
+
+                        return true;
                     }
-                    if (this.SelectFilesBox.SelectedIndex != CategoryIndex)
-                        this.SelectFilesBox.SelectedIndex = CategoryIndex; // Вызовет SelectFilesBox_SelectionChanged
-                    else
-                        RefreshMainGridAndSetCount(LoadedFile.Rows);
-
-                    return true;
                 }
+            }
+            catch(Exception)
+            {
+                MessageBox.Show($"Невозможно загрузить категорию по индексу {CategoryIndex}",
+                    "Исключение", 
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+
+                return false;
             }
             return false;
         }
@@ -1520,13 +1628,13 @@ namespace ModTranslator
         /// <summary>
         /// Обновление списка в SelectFilesBox
         /// </summary>
-        private void UpdateSelectFilesBox(List<string>? Cats)
+        private static void UpdateSelectFilesBox(List<string>? Cats, ComboBox Box)
         {
-            this.SelectFilesBox.ItemsSource = Cats;
+            Box.ItemsSource = Cats;
 
-            this.SelectFilesBox.Items.Refresh();
+            Box.Items.Refresh();
 
-            this.SelectFilesBox.SelectedIndex = 0;
+            Box.SelectedIndex = 0;
         }
 
         private async void OpenModButton_Click(object sender, RoutedEventArgs e)
@@ -1547,13 +1655,13 @@ namespace ModTranslator
 
                 this.g_ModFolderPath = FolderDialog.FolderName;
 
-                var SavedCats = SaveAllCats();
+                var SavedCats = WorkLoad.SaveAll();
 
-                if ((await LoadModFilesAndCategories(FolderDialog.FolderName, false)).IsError == true)
+                if ((await LoadModFilesAndCategories(FolderDialog.FolderName)).IsError == true)
                 {
                     MessageBox.Show("Неверный мод.", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
 
-                    RestoreAllCats(SavedCats);
+                    WorkLoad.RestoreAll(SavedCats, this.SelectFilesBox);
 
                     return;
                 }
@@ -1562,7 +1670,7 @@ namespace ModTranslator
                 {
                     MessageBox.Show("Ошибка загрузки категории.", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
 
-                    RestoreAllCats(SavedCats);
+                    WorkLoad.RestoreAll(SavedCats, this.SelectFilesBox);
 
                     return;
                 }
@@ -1642,16 +1750,28 @@ namespace ModTranslator
 
                     AllCatsIsChanged(false);
 
-                    if ((await LoadModFilesAndCategories(ModPathText.Text, false)).IsError == false)
+                    var Saved = WorkLoad.SaveAll();
+
+                    if ((await LoadModFilesAndCategories(ModPathText.Text)).IsError == false)
                     {
+                        this.Title = Settings.AppTitle;
+
+                        this.g_OptionsWindow.g_CompareMode = false;
+
+                        this.g_OptionsWindow.CompMode.IsChecked = false;
+
                         this.g_ModFolderPath = ModPathText.Text;
 
-                        this.SelectFilesBox.IsEnabled = true;
+                        LoadCategoryFromFileBox(0);
 
                         EnableControlElements();
                     }
                     else
+                    {
                         MessageBox.Show("Неверный мод.", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+
+                        WorkLoad.RestoreAll(Saved, this.SelectFilesBox);
+                    }
 
                 }
             }
@@ -1713,7 +1833,7 @@ namespace ModTranslator
 
             if (FolderDialog.ShowDialog() == true)
             {
-                var LoadResult = await LoadModFilesAndCategories(FolderDialog.FolderName, true);
+                var LoadResult = await LoadModFilesAndCompare(FolderDialog.FolderName);
 
                 if (LoadResult.IsError == true)
                 {
@@ -2124,10 +2244,10 @@ namespace ModTranslator
                 {
                     RowData.Visibility = Visibility.Visible;
 
-                    RowData.ToolTip = GetRowToolTipText(ModText);
-
                     if (this.g_OptionsWindow != null)
                     {
+                        RowData.ToolTip = GetRowToolTipText(ModText);
+
                         var ShowNpc = this.g_OptionsWindow.ShowNPC.IsChecked ?? true; // По умолчанию включено.
 
                         if (ShowNpc)
@@ -2136,14 +2256,17 @@ namespace ModTranslator
                             {
                                 var NPC = ModText.NPC;
 
+                                // Если нпс-женщина
                                 if (NPC.IsWoman)
                                 {
                                    RowData.Background = Settings.FemalesColor;
                                 }
+                                // Мужчина
                                 else if (NPC.IsMan)
                                 {
                                     RowData.Background = Settings.MansColor;
                                 }
+                                // Непонятно кто. (эльф, гном, робот и т.д)
                                 else if (NPC.IsOther)
                                 {
                                    RowData.Background = Settings.UnknownsColor;
@@ -2151,9 +2274,11 @@ namespace ModTranslator
                                 else
                                     RowData.Background = Settings.DefaultRowColor;
                             }
-
-                            if (ModText.Dialogue != null)
+                            else if (ModText.Dialogue != null)
                             {
+                                if (this.g_OptionsWindow.g_CompareMode == true)  // Не подсвечивать диалоги при сравнении, т.к id будут не верными.
+                                    return;
+
                                 var Talking = ModText.Dialogue;
 
                                 var TalkingWith = ModText.Dialogue.TalkingWith;
@@ -2286,39 +2411,6 @@ namespace ModTranslator
                     }
                 }
             });
-        }
-
-        public List<WorkLoad.CatInfo> SaveAllCats()
-        {
-            var Result = new List<WorkLoad.CatInfo>();
-
-            foreach (var Cat in WorkLoad.GetBindings())
-            {
-                if (Cat.Rows != null)
-                    Result.Add(Cat.Clone());
-            }
-            return Result;
-        }
-
-        public void RestoreAllCats(List<WorkLoad.CatInfo>? CatsList)
-        {
-            if (CatsList != null)
-            {
-                var CatsName = new List<string>();
-
-                foreach (var Cat in CatsList)
-                {
-                    var Category = WorkLoad.FindByCategory(Cat.Category);
-
-                    if (Category == null)
-                        throw new Exception("Всё плохо. Не получилось восстановить данные категорий");
-
-                    Category.CopyFrom(Cat);
-
-                    CatsName.Add(Cat.Category);
-                }
-                this.SelectFilesBox.ItemsSource = CatsName;
-            }
         }
 
     }

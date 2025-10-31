@@ -1408,7 +1408,7 @@ namespace WarbandParser
                 .Where(s => !s.RowId.EndsWith("_pl", StringComparison.Ordinal))
                 .ToList();
 
-            if (TroopsWithNoPlural.Count >= Number)
+            if (TroopsWithNoPlural.Count > Number)
                 return TroopsWithNoPlural[Number];
             else
                 return null;
@@ -1472,40 +1472,12 @@ namespace WarbandParser
             return Result;
         }
 
-        /*
         /// <summary>
         /// Возвращает разницу между новым и старым списком переводов.
         /// </summary>
-        /// <param name="NewRows">Новый перевод</param>
         /// <param name="OldRows">Старый перевод</param>
-        /// <returns></returns>
-        public static List<ModTextRow> GetModTextChange(List<ModTextRow> NewRows, List<ModTextRow>? OldRows, StringComparison CompareType = StringComparison.OrdinalIgnoreCase)
-        {
-            var Result = new List<ModTextRow>();
-
-            if (OldRows == null)
-                return NewRows;
-
-            foreach (var RowData in NewRows)
-            {
-                var FoundRow = OldRows.FirstOrDefault(x => x.RowId == RowData.RowId); // Ищем в старом переводе строки ID
-
-                if (FoundRow == null) // Если их нет, то значит это новые строки
-                {
-                    Result.Add(RowData); // добавляем в список.
-                }
-                else
-                {
-                    if (!string.Equals(RowData.OriginalText, FoundRow.OriginalText, CompareType)) // Сравниваем оригинальные тексты.
-                    {
-                        Result.Add(RowData); // Если отличаются, то добавляем.
-                    }
-                }
-            }
-            return Result;
-        }
-        */
-
+        /// <param name="NewRows">Новый перевод</param>
+        /// <returns>Вернет чем отличается НОВЫЙ от старого</returns>
         public static List<ModTextRow> GetNewOrModifiedRows(List<ModTextRow>? OldRows, List<ModTextRow> NewRows, StringComparison CompareType = StringComparison.OrdinalIgnoreCase)
         {
             if (OldRows == null)
