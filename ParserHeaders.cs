@@ -23,6 +23,21 @@
         //
         public NpcType? NPC          { get; set; } = null;
         public WhoTalking? Dialogue  { get; set; } = null;
+
+        public ModTextRow Clone()
+        {
+            return new ModTextRow
+            {
+                RowId          = new string(this.RowId),
+                OriginalText   = new string(this.OriginalText),
+                TranslatedText = new string(TranslatedText),
+                Flags          = this.Flags,
+                DataPos        = this.DataPos,
+                RawLine        = new string(this.RawLine),
+                NPC            = this.NPC?.Clone(),
+                Dialogue       = this.Dialogue?.Clone() 
+            };
+        }
     }
 
     public class ModRowInfo
@@ -42,9 +57,23 @@
         public bool IsHero     = false;  // Нпс-герой
         public bool IsMerchant = false;  // Нпс-торговец
 
-        public string ID = string.Empty;         // Id в войсках / группах
-        public string Name = string.Empty;       // Имя нпс в ед.числе
+        public string ID         = string.Empty; // Id в войсках / группах
+        public string Name       = string.Empty; // Имя нпс в ед.числе
         public string NamePlural = string.Empty; // Имя нпс в мн.числе род.падеже. (обычно)
+
+        public NpcType Clone()
+        {
+            return new NpcType
+            {
+                IsMan      = this.IsMan,
+                IsWoman    = this.IsWoman,
+                IsOther    = this.IsOther,
+                IsHero     = this.IsHero,
+                ID         = new string(this.ID),
+                Name       = new string(this.Name),
+                NamePlural = new string(this.NamePlural)
+            };
+        }
     }
 
     /// <summary>
@@ -78,6 +107,18 @@
         public bool IsNpc    = false;
 
         public NpcType TalkingWith = new NpcType();
+
+        public WhoTalking Clone()
+        {
+            return new WhoTalking
+            {
+                IsPlayer    = this.IsPlayer,
+                IsAnyone    = this.IsAnyone,
+                IsParty     = this.IsParty,
+                IsNpc       = this.IsNpc,
+                TalkingWith = this.TalkingWith.Clone()
+            };
+        }
     }
 
     public class DialogLine

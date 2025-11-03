@@ -91,19 +91,28 @@ namespace ModTranslator
         {
             public class CatInfo
             {
+                public string FileName        { get; set; } = string.Empty;
+                public string FullFileName    { get; set; } = string.Empty;
+                public string ExportName      { get; set; } = string.Empty;
+                public string Category        { get; set; } = string.Empty;
+
+                public bool IsChanged         { get; set; } = false;
+                public List<ModTextRow>? Rows { get; set; } = null;
+
                 public CatInfo Clone()
                 {
                     return new CatInfo
                     {
-                        FileName     = new string(FileName),
-                        FullFileName = new string(FullFileName),
-                        ExportName   = new string(ExportName),
-                        Category     = new string(Category),
-                        IsChanged    = IsChanged,
-                        Rows         = Rows?.ToList()
+                        FileName     = new string(this.FileName),
+                        FullFileName = new string(this.FullFileName),
+                        ExportName   = new string(this.ExportName),
+                        Category     = new string(this.Category),
+                        IsChanged    = this.IsChanged,
+                        Rows         = this.Rows?.Select(row => row.Clone()).ToList()
                     };
                 }
 
+                // Копирует ссылки.
                 public void CopyFrom(CatInfo Data)
                 {
                     this.Category     = Data.Category;
@@ -113,14 +122,6 @@ namespace ModTranslator
                     this.IsChanged    = Data.IsChanged;
                     this.Rows         = Data.Rows;
                 }
-
-                public string FileName        { get; set; } = string.Empty;
-                public string FullFileName    { get; set; } = string.Empty;
-                public string ExportName      { get; set; } = string.Empty;
-                public string Category        { get; set; } = string.Empty;
-
-                public bool IsChanged         { get; set; } = false;
-                public List<ModTextRow>? Rows { get; set; } = null;
             }
 
             /// <summary>
@@ -219,7 +220,7 @@ namespace ModTranslator
                         if (Category == null)
                             throw new Exception("Всё плохо. Не получилось восстановить данные категорий");
 
-                        Category.CopyFrom(Cat);
+                        Category.CopyFrom(Cat); // Копирует только ссылки от сохраненных данных.
 
                         CatsName.Add(Cat.Category);
                     }
@@ -1080,41 +1081,40 @@ namespace ModTranslator
         {
             bool WriteDummy = false;
 
-            using (StreamWriter WriteText = new StreamWriter(FilePath))
+            using var WriteText = new StreamWriter(FilePath);
+
+            var MainRows = GetMainRows();
+
+            foreach (var TextData in MainRows)
             {
-                var MainRows = GetMainRows();
-
-                foreach (var TextData in MainRows)
+                if (WriteDummy == false)
                 {
-                    if (WriteDummy == false)
+                    var Prefix = Parser.ExtractPrefixFromId(TextData.RowId);
+
+                    WriteText.WriteLine(Prefix + "1164|Do not delete this line");
+
+                    WriteDummy = true;
+                }
+
+                if (IsVisibleRow(TextData)) // Пишем только видимые строки.
+                {
+                    string TranslatedData = TextData.TranslatedText;
+
+                    if (EmptyExport) // Если экспорт только пустых
                     {
-                        var Prefix = Parser.ExtractPrefixFromId(TextData.RowId);
-
-                        WriteText.WriteLine(Prefix + "1164|Do not delete this line");
-
-                        WriteDummy = true;
+                        if (string.IsNullOrEmpty(TranslatedData))
+                            TranslatedData = TextData.OriginalText; // Меняем пустой перевод на оригинал
+                        else
+                            continue; // Если не пустая, то пропускаем запись.
                     }
 
-                    if (IsVisibleRow(TextData)) // Пишем только видимые строки.
+                    if (!string.IsNullOrEmpty(TranslatedData)) // Не записываем в файл поля без перевода. (Возможно стоит?)
                     {
-                        string TranslatedData = TextData.TranslatedText;
+                        var ResultTranlatedText = ReplaceForbiddenChars(TranslatedData);
 
-                        if (EmptyExport) // Если экспорт только пустых
-                        {
-                            if (string.IsNullOrEmpty(TranslatedData))
-                                TranslatedData = TextData.OriginalText; // Меняем пустой перевод на оригинал
-                            else
-                                continue; // Если не пустая, то пропускаем запись.
-                        }
+                        string NewLine = TextData.RowId + "|" + ResultTranlatedText;
 
-                        if (!string.IsNullOrEmpty(TranslatedData)) // Не записываем в файл поля без перевода. (Возможно стоит?)
-                        {
-                            var ResultTranlatedText = ReplaceForbiddenChars(TranslatedData);
-
-                            string NewLine = TextData.RowId + "|" + ResultTranlatedText;
-
-                            WriteText.WriteLine(NewLine);
-                        }
+                        WriteText.WriteLine(NewLine);
                     }
                 }
             }
@@ -2329,10 +2329,10 @@ namespace ModTranslator
 
         private string? GetRowToolTipText(ModTextRow? Row)
         {
-            StringBuilder Text = new StringBuilder();
-
             if (Row != null)
             {
+                StringBuilder Text = new StringBuilder();
+
                 // Персонажи
                 if (Row.NPC != null)
                 {
@@ -2352,6 +2352,9 @@ namespace ModTranslator
                 // Диалоги
                 if (Row.Dialogue != null)
                 {
+                    if (this.g_OptionsWindow.g_CompareMode == true)  // Не выводить подсказку в режиме сравнения.
+                        return null;
+
                     var Talking = Row.Dialogue;
 
                     if (Talking.IsPlayer && Talking.IsAnyone)
@@ -2387,7 +2390,7 @@ namespace ModTranslator
         }
 
         // Fixme: cделать всё в парсере, а не так.
-        private async void PrepareCategoriesForTable()
+        public static async void PrepareCategoriesForTable()
         {
             await Task.Run(() =>
             {

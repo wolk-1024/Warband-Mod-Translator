@@ -16,6 +16,25 @@ namespace WarbandParser
 {
     public static class Parser
     {
+        private static class ParseRegex
+        {
+            /// <summary>
+            /// Регулярка для не юникод чисел
+            /// </summary>
+            public static readonly Regex RegOnlyNumbers = new Regex(@"^\s*-?[0-9]+\s*$", RegexOptions.Compiled);
+
+            /// <summary>
+            /// Не юникод-float и НЕ экспонента.
+            /// </summary>
+            public static readonly Regex RegOnlyFloatNumbers = new Regex(@"^[+-]?(?:[0-9]+\.[0-9]+|[0-9]+)(?<!\.[+-]?)$", RegexOptions.Compiled);
+
+            /// <summary>
+            /// Регулярка для слов и знаков.
+            /// Юникод-числа и экспоненциальные записи будут считаться строкой.
+            /// </summary>
+            public static readonly Regex RegWordsAndSymbols = new Regex(@"^(?!\s*$)(?!\s*-?[0-9]+(?:\.[0-9]+)?\s*$).+", RegexOptions.Compiled);
+        }
+
         /// <summary>
         /// Настройка для удаления дубликатов ID.
         /// </summary>
@@ -25,22 +44,6 @@ namespace WarbandParser
         /// Настройка для игнорирование {!} в строках. 
         /// </summary>
         public static bool g_IgnoreBlockingSymbol = false;
-
-        /// <summary>
-        /// Регулярка для не юникод чисел
-        /// </summary>
-        private static readonly Regex RegOnlyNumbers = new Regex(@"^\s*-?[0-9]+\s*$", RegexOptions.Compiled);
-
-        /// <summary>
-        /// Не юникод-float и НЕ экспонента.
-        /// </summary>
-        private static Regex RegOnlyFloatNumbers = new Regex(@"^[+-]?(?:[0-9]+\.[0-9]+|[0-9]+)(?<!\.[+-]?)$", RegexOptions.Compiled);
-
-        /// <summary>
-        /// Регулярка для слов и знаков.
-        /// Юникод-числа и экспоненциальные записи будут считаться строкой.
-        /// </summary>
-        private static readonly Regex RegWordsAndSymbols = new Regex(@"^(?!\s*$)(?!\s*-?[0-9]+(?:\.[0-9]+)?\s*$).+", RegexOptions.Compiled);
 
         /// <summary>
         /// Список поддерживаемых префиксов.
@@ -144,7 +147,7 @@ namespace WarbandParser
         /// <returns></returns>
         private static bool IsStringArg(string Value)
         {
-            return RegWordsAndSymbols.IsMatch(Value);
+            return ParseRegex.RegWordsAndSymbols.IsMatch(Value);
         }
 
         /// <summary>
@@ -154,7 +157,7 @@ namespace WarbandParser
         /// <returns></returns>
         private static bool IsInteger32Arg(string Value)
         {
-            if (RegOnlyNumbers.IsMatch(Value))
+            if (ParseRegex.RegOnlyNumbers.IsMatch(Value))
                 return int.TryParse(Value, NumberStyles.Integer, CultureInfo.GetCultureInfo("en-US"), out _);
             else
                 return false;
@@ -167,7 +170,7 @@ namespace WarbandParser
         /// <returns></returns>
         private static bool IsInteger64Arg(string Value)
         {
-            if (RegOnlyNumbers.IsMatch(Value))
+            if (ParseRegex.RegOnlyNumbers.IsMatch(Value))
                 return Int64.TryParse(Value, NumberStyles.Integer, CultureInfo.GetCultureInfo("en-US"), out _);
             else
                 return false;
@@ -180,7 +183,7 @@ namespace WarbandParser
         /// <returns></returns>
         private static bool IsFloatArg(string Value)
         {
-            if (RegOnlyFloatNumbers.IsMatch(Value))
+            if (ParseRegex.RegOnlyFloatNumbers.IsMatch(Value))
                 return float.TryParse(Value, NumberStyles.Float, CultureInfo.GetCultureInfo("en-US"), out _);
             else
                 return false;
@@ -359,7 +362,7 @@ namespace WarbandParser
 
             if (File.Exists(FilePath) && !string.IsNullOrEmpty(Prefix))
             {
-                string TextData = EncodingText.ReadTextFileAndConvertTo(FilePath, Encoding.Unicode);
+                string TextData = EncodingText.ReadTextFileAndConvertTo(FilePath, Encoding.UTF8);
 
                 if (TextData.Length > 0)
                     Result = ParseTextData(TextData, Prefix);
@@ -481,41 +484,39 @@ namespace WarbandParser
             return Result;
         }
 
-        /*
         private static OriginalFileHeader GetFileHeader(string FilePath)
         {
             var Result = new OriginalFileHeader();
 
             if (File.Exists(FilePath))
             {
-                using (var Reader = new StreamReader(FilePath))
-                {
-                    var FirstLine = Reader.ReadLine();
+                using var Reader = new StreamReader(FilePath);
 
-                    var SecondLine = Reader.ReadLine();
+                var FirstLine = Reader.ReadLine();
 
-                    if (string.IsNullOrEmpty(FirstLine) || string.IsNullOrEmpty(SecondLine))
-                        return Result;
+                var SecondLine = Reader.ReadLine();
 
-                    var SplitFirstLine = FirstLine.Trim().Split(" ");
+                if (string.IsNullOrEmpty(FirstLine) || string.IsNullOrEmpty(SecondLine))
+                    return Result;
 
-                    if (SplitFirstLine.Count() < 3)
-                        return Result;
+                var SplitFirstLine = FirstLine.Trim().Split(" ");
 
-                    Result.Name = SplitFirstLine.First();
+                if (SplitFirstLine.Count() < 3)
+                    return Result;
 
-                    int Ver;
+                Result.Name = SplitFirstLine.First();
 
-                    if (int.TryParse(SplitFirstLine.Last(), out Ver))
-                        Result.Version = Ver;
+                int Ver;
 
-                    var SplitSecondLine = SecondLine.Trim().Split(" "); // В parties.txt почему-то по 2 одинаковых числа. хз зачем второе.
+                if (int.TryParse(SplitFirstLine.Last(), out Ver))
+                    Result.Version = Ver;
 
-                    int Count;
+                var SplitSecondLine = SecondLine.Trim().Split(" "); // В parties.txt почему-то по 2 одинаковых числа. хз зачем второе.
 
-                    if (int.TryParse(SplitSecondLine.First(), out Count))
-                        Result.Entries = Count;
-                }
+                int Count;
+
+                if (int.TryParse(SplitSecondLine.First(), out Count))
+                    Result.Entries = Count;
             }
             return Result;
         }
@@ -527,7 +528,6 @@ namespace WarbandParser
             else
                 return -1;
         }
-        */
 
         private static WhoTalking GetDialogueCondition(uint? DialogueFlags, List<ModTextRow>? TroopsList, List<ModTextRow>? PartyTempList)
         {
@@ -1402,16 +1402,18 @@ namespace WarbandParser
         /// <summary>
         /// Функция для получения строки с нпс или группы по его номеру (от 0). (игнорируя _pl)
         /// </summary>
-        private static ModTextRow? GetTroopOrGroupByNumber(List<ModTextRow> DataList, int Number)
+        private static ModTextRow? GetTroopOrGroupByNumber(List<ModTextRow>? DataList, int Number)
         {
-            var TroopsWithNoPlural = DataList
-                .Where(s => !s.RowId.EndsWith("_pl", StringComparison.Ordinal))
-                .ToList();
+            if (DataList != null)
+            {
+                var TroopsWithNoPlural = DataList
+                    .Where(s => !s.RowId.EndsWith("_pl", StringComparison.Ordinal))
+                    .ToList();
 
-            if (TroopsWithNoPlural.Count > Number)
-                return TroopsWithNoPlural[Number];
-            else
-                return null;
+                if (TroopsWithNoPlural.Count > Number)
+                    return TroopsWithNoPlural[Number];
+            }
+             return null;
         }
 
         public static List<ModTextRow> LoadAndParseTroopsFile(string FilePath)
