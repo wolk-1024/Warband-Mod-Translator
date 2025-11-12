@@ -966,6 +966,21 @@ namespace WarbandParser
                         Flags        = NewFlags,
                         DataPos      = MnoDataPos
                     });
+
+                    var DoorText = GetStringArg(SubMenu, 3).Replace("_", " ");
+
+                    if (!string.IsNullOrEmpty(DoorText) && DoorText != ".")
+                    {
+                        var DoorID = SubMenuID + "_door";
+
+                        Result.Add(new ModTextRow
+                        {
+                            RowId        = DoorID,
+                            OriginalText = DoorText,
+                            Flags        = NewFlags, // Зависит ли отображение дверей от подменю? Поэтому хз какие флаги ставить.
+                            DataPos      = MnoDataPos
+                        });
+                    }
                 }
             }
             return Result;
@@ -1012,7 +1027,7 @@ namespace WarbandParser
 
                     var SubMenus = ParseMenuBlock(Block);
 
-                    if (SubMenus != null)
+                    if (SubMenus.Count > 0)
                         Result.AddRange(SubMenus);
                 }
                 return MarkDuplicateIDs(Result);
