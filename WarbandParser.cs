@@ -428,7 +428,7 @@ namespace WarbandParser
 
             if (File.Exists(FilePath))
             {
-                string TextData = EncodingText.ReadTextFileAndConvertTo(FilePath, Encoding.Unicode);
+                string TextData = EncodingText.ReadTextFileAndConvertTo(FilePath, Encoding.UTF8);
 
                 if (TextData.Length > 0)
                     Result = ParseTextData(TextData, Prefixes);
@@ -1668,7 +1668,7 @@ namespace WarbandParser
 
             if (ParsedMenu.Count > 0)
             {
-                var ResultMenu = EncodingText.ReadTextFileAndConvertTo(MenuFile, Encoding.Unicode);
+                var ResultMenu = EncodingText.ReadTextFileAndConvertTo(MenuFile, Encoding.UTF8);
 
                 if (!string.IsNullOrEmpty(ResultMenu))
                 {
@@ -1680,38 +1680,38 @@ namespace WarbandParser
                     {
                         var PosStart = Item.DataPos.Start + RelIndex;
 
-                        if (Item.Flags.HasFlag(Flags)) // Только дубликаты
+                        if (Item.Flags.HasFlag(Flags) && IsLineStartsWithPrefix(Item.RowId, "mno_")) // Только дублированные подменю.
                         {
-                            if (IsLineStartsWithPrefix(Item.RowId, "mno_")) // и подменю.
+                            if (Item.RowId.EndsWith("_door")) // пропускаем id-двери
+                                continue;
+
+                            if (!WorkedIds.ContainsKey(Item.RowId))
                             {
-                                if (!WorkedIds.ContainsKey(Item.RowId))
-                                {
-                                    var MaxNum = GetMaxNumSuffix(ParsedMenu, Item.RowId, Suffix);
+                                var MaxNum = GetMaxNumSuffix(ParsedMenu, Item.RowId, Suffix);
 
-                                    WorkedIds.Add(Item.RowId, MaxNum);
-                                }
-
-                                var CurrentEnter = WorkedIds[Item.RowId]; // Количество вхождений id
-
-                                var NewSuffix = $"{Suffix}{CurrentEnter + 1}";
-
-                                var IdWithSuffix = Item.RowId + NewSuffix; // Пример: mno_continue.wt1
-
-                                ResultMenu = ReplaceWordByIndex(ResultMenu, PosStart, Item.RowId.Length, IdWithSuffix);
-
-                                if (ResultMenu == null)
-                                    return string.Empty;
-
-                                RelIndex += NewSuffix.Length; // Каждая замена строки увеличивает результат на длину суффикса.
-
-                                WorkedIds[Item.RowId] = CurrentEnter + 1;
-
-                                RenamedIds++;
+                                WorkedIds.Add(Item.RowId, MaxNum);
                             }
+
+                            var CurrentEnter = WorkedIds[Item.RowId]; // Количество вхождений id
+
+                            var NewSuffix = $"{Suffix}{CurrentEnter + 1}";
+
+                            var IdWithSuffix = Item.RowId + NewSuffix; // Пример: mno_continue.wt1
+
+                            ResultMenu = ReplaceWordByIndex(ResultMenu, PosStart, Item.RowId.Length, IdWithSuffix);
+
+                            if (ResultMenu == null)
+                                return string.Empty;
+
+                            RelIndex += NewSuffix.Length; // Каждая замена строки увеличивает результат на длину суффикса.
+
+                            WorkedIds[Item.RowId] = CurrentEnter + 1;
+
+                            RenamedIds++;
                         }
                     }
+                    return ResultMenu;
                 }
-                return ResultMenu;
             }
             return string.Empty;
         }

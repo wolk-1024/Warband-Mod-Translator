@@ -10,6 +10,11 @@ namespace ModTranslatorSettings
     public partial class SettingsWindow : Window
     {
         /// <summary>
+        /// Флаг, указывающий какие дубликаты перезаписывать в menus.txt
+        /// </summary>
+        private const RowFlags c_RewriteDublicatesFlag = RowFlags.Dublicate;
+
+        /// <summary>
         /// Суффикс для дубликатов id
         /// </summary>
         private const string c_DublicateSuffix = ".";
@@ -19,10 +24,7 @@ namespace ModTranslatorSettings
         /// </summary>
         private MainTranslatorWindow MainWindow;
 
-        /// <summary>
-        /// 
-        /// </summary>
-        public List<WorkLoad.CatInfo>? g_OldCatsData = null;
+        private List<WorkLoad.CatInfo>? g_OldCatsData = null;
 
         public bool g_CompareMode = false;
 
@@ -281,7 +283,7 @@ namespace ModTranslatorSettings
 
             int RenamedIds = 0;
 
-            var NewMenuText = Parser.ReCreateMenuFile(MenuFilePath, c_DublicateSuffix, out RenamedIds, RowFlags.Dublicate);
+            var NewMenuText = Parser.ReCreateMenuFile(MenuFilePath, c_DublicateSuffix, out RenamedIds, c_RewriteDublicatesFlag);
 
             if (RenamedIds == 0 && !string.IsNullOrEmpty(NewMenuText))
             {
@@ -294,7 +296,7 @@ namespace ModTranslatorSettings
             {
                 var BackupFullPath = Path.GetDirectoryName(MenuFilePath) + "\\" + GetNewBackupFileName(MenuFilePath);
 
-                var Answer = MessageBox.Show($"Перезаписать {RenamedIds} дублированных ID в \"{MenuFilePath}\" ?\nБудет создана резервная копия \"{BackupFullPath}\"", "Внимание!", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+                var Answer = MessageBox.Show($"Перезаписать {RenamedIds} ID в \"{MenuFilePath}\" ?\nБудет создана резервная копия \"{BackupFullPath}\"", "Внимание!", MessageBoxButton.YesNo, MessageBoxImage.Warning);
 
                 if (Answer == MessageBoxResult.Yes)
                 {

@@ -691,7 +691,7 @@ namespace ModTranslator
                     var CsvSeparator = DetectCsvLineSeparator(Line, CandidateSeparators);
 
                     if (CsvSeparator == null)
-                        return null;
+                        continue;
 
                     Result.Add((char)CsvSeparator);
 
@@ -2357,29 +2357,31 @@ namespace ModTranslator
 
                     var Talking = Row.Dialogue;
 
+                    var TalkingWithName = Talking.TalkingWith.Name.Replace("_", " ");
+
                     if (Talking.IsPlayer && Talking.IsAnyone)
                     {
-                        Text.Append($"Кто: Игрок\nКому: Кому-то");
+                        Text.Append($"Кто:\n  Игрок\nКому:\n  Кому-то");
                     }
                     else if (Talking.IsAnyone && !Talking.IsPlayer)
                     {
-                        Text.Append($"Кто: Кто-то\nКому: Игроку");
+                        Text.Append($"Кто:\n  Кто-то\nКому:\n  Игроку");
                     }
                     else if (Talking.IsParty && !Talking.IsPlayer)
                     {
-                        Text.Append($"Кто: Группа {Talking.TalkingWith.ID}\nКому: Игроку");
+                        Text.Append($"Кто:\n  Группа {TalkingWithName}\n  {Talking.TalkingWith.ID}\nКому:\n  Игроку");
                     }
                     else if (Talking.IsParty && Talking.IsPlayer)
                     {
-                        Text.Append($"Кто: Игрок\nКому: Группе {Talking.TalkingWith.ID}");
+                        Text.Append($"Кто:\n  Игрок\nКому:\n  Группе {TalkingWithName}\n  {Talking.TalkingWith.ID}");
                     }
                     else if (Talking.IsPlayer && Talking.IsNpc)
                     {
-                        Text.Append($"Кто: Игрок\nКому: {Talking.TalkingWith.ID} ({GetNpcSex(Talking.TalkingWith).ToLower()})");
+                        Text.Append($"Кто:\n  Игрок\nКому:\n  {TalkingWithName} ({GetNpcSex(Talking.TalkingWith).ToLower()})\n  {Talking.TalkingWith.ID}");
                     }
                     else if (Talking.IsNpc)
                     {
-                        Text.Append($"Кто: {Talking.TalkingWith.ID} ({GetNpcSex(Talking.TalkingWith).ToLower()})\nКому: Игроку");
+                        Text.Append($"Кто:\n  {TalkingWithName} ({GetNpcSex(Talking.TalkingWith).ToLower()})\n  {Talking.TalkingWith.ID}\nКому:\n  Игроку");
                     }
 
                     if (Text.Length > 0)
@@ -2390,30 +2392,27 @@ namespace ModTranslator
         }
 
         // Fixme: cделать всё в парсере, а не так.
-        public static async void PrepareCategoriesForTable()
+        public static void PrepareCategoriesForTable()
         {
-            await Task.Run(() =>
+            var TroopsCategory = WorkLoad.FindByPrefix("trp_");
+
+            if (TroopsCategory != null && TroopsCategory.Rows != null)
             {
-                var TroopsCategory = WorkLoad.FindByPrefix("trp_");
+                var DialogCategory = WorkLoad.FindByPrefix("dlga_");
 
-                if (TroopsCategory != null && TroopsCategory.Rows != null)
+                if (DialogCategory != null && DialogCategory.Rows != null)
                 {
-                    var DialogCategory = WorkLoad.FindByPrefix("dlga_");
+                    var PartyTemplateCategory = WorkLoad.FindByPrefix("pt_");
 
-                    if (DialogCategory != null && DialogCategory.Rows != null)
+                    if (PartyTemplateCategory != null && PartyTemplateCategory.Rows != null)
                     {
-                        var PartyTemplateCategory = WorkLoad.FindByPrefix("pt_");
-
-                        if (PartyTemplateCategory != null && PartyTemplateCategory.Rows != null)
+                        foreach (var Dialog in DialogCategory.Rows)
                         {
-                            foreach (var Dialog in DialogCategory.Rows)
-                            {
-                                Dialog.Dialogue = Parser.GetDialogueCondition(Dialog.RawLine, TroopsCategory.Rows, PartyTemplateCategory.Rows);
-                            }
+                            Dialog.Dialogue = Parser.GetDialogueCondition(Dialog.RawLine, TroopsCategory.Rows, PartyTemplateCategory.Rows);
                         }
                     }
                 }
-            });
+            }
         }
 
     }
