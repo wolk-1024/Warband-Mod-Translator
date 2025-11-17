@@ -157,6 +157,11 @@
         public static implicit operator string(ParseArg Wrapper) { return Wrapper?.Value ?? string.Empty; }
 
         public override string ToString() { return Value; }
+
+        public string[] Split(string? Separator, StringSplitOptions Options = StringSplitOptions.None)
+        {
+            return Value.Split(Separator, Options);
+        }
     }
 
     public class OriginalFileHeader
@@ -166,5 +171,23 @@
         public int Version = 1;
 
         public int Entries = -1;
+    }
+
+    public class SpecialRecord
+    {
+        public string ID    = string.Empty;
+
+        public string Text  = string.Empty;
+
+        public int ParamPos = -1;
+    }
+
+    public class MenuParams
+    {
+        public string MenuID   = string.Empty;
+
+        public string MenuText = string.Empty;
+
+        public string DoorName = string.Empty;
     }
 }

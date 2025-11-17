@@ -1,5 +1,5 @@
 ﻿/*
- *  Парсер v28.10.2025
+ *  Парсер v17.11.2025
  *  
  */
 
@@ -529,6 +529,60 @@ namespace WarbandParser
                 return -1;
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="Line"></param>
+        /// <param name="ParamPos"></param>
+        /// <returns></returns>
+        private static SpecialRecord ReadSpecialRecords(ParseArg Line, int RecordPos)
+        {
+            var Result = new SpecialRecord();
+
+            int CurrentPos = RecordPos;
+
+            try
+            {
+                var Params = Line.Split(" ", StringSplitOptions.RemoveEmptyEntries);
+
+                if (Params.Count() >= CurrentPos)
+                {
+                    int Records = 0, R = 0; // Общее количество записей
+
+                    if (int.TryParse(Params[CurrentPos], out Records))
+                    {
+                        if (Records < Params.Count())
+                        {
+                            for (R = 0; R < Records; R++)
+                            {
+                                CurrentPos++; // Пропускаем флаг.
+
+                                int ParamNum = 0; // Количество параметров.
+
+                                if (!int.TryParse(Params[(CurrentPos + R) + 1], out ParamNum))
+                                    return Result;
+
+                                CurrentPos += ParamNum;
+                            }
+                        }
+                    }
+                    var ResultPos = CurrentPos + R + 1;
+
+                    if (ResultPos <= Params.Length)
+                    {
+                        Result.ID = Params.First();
+                        Result.Text = Params[ResultPos];
+                        Result.ParamPos = ResultPos;
+                    }
+                }
+            }
+            catch (Exception)
+            {
+                return Result;
+            }
+            return Result;
+        }
+
         private static WhoTalking GetDialogueCondition(uint? DialogueFlags, List<ModTextRow>? TroopsList, List<ModTextRow>? PartyTempList)
         {
             WhoTalking Result = new WhoTalking();
@@ -630,44 +684,12 @@ namespace WarbandParser
 
             if (IsLineStartsWithPrefix(DialogueLine, "dlga_"))
             {
-                var AllParams = DialogueLine.Split(" ", StringSplitOptions.RemoveEmptyEntries);
-
-                int CurrentPos = 3;
-
                 // 0 - ID, 1 - флаг диалога, 2 - (пропускаем), 3 - количество чего-то, (это что-то пропускаем), искомый текст (минимум 4-я позиция)
-                if (AllParams.Count() >= CurrentPos)
-                {
-                    int RecN = 0, R = 0; // Общее количество записей
+                var DialogueText = ReadSpecialRecords(DialogueLine, 3);
 
-                    if (int.TryParse(AllParams[CurrentPos], out RecN))
-                    {
-                        if (RecN < AllParams.Count())
-                        {
-                            for (R = 0; R < RecN; R++)
-                            {
-                                CurrentPos++; // Пропускаем флаг.
-
-                                int TextParamN = 0; // Количество параметров.
-
-                                if (!int.TryParse(AllParams[(CurrentPos + R) + 1], out TextParamN))
-                                    return Result;
-
-                                CurrentPos += TextParamN;
-                            }
-
-                            var ResPos = CurrentPos + R + 1;
-
-                            if (ResPos <= AllParams.Length)
-                            {
-                                Result.ID = AllParams.First(); // ID диалога (dlga_ramun и т.д)
-
-                                Result.Text = AllParams[ResPos]; // Текст реплики.
-
-                                //Result.WhoIs = GetDialogueCondition(DialogueLine, TroopsList, PartyTempList);
-                            }
-                        }
-                    }
-                }
+                Result.ID    = DialogueText.ID;
+                Result.Text  = DialogueText.Text;
+                //Result.WhoIs = GetDialogueCondition(DialogueLine, TroopsList, PartyTempList);
             }
             return Result;
         }
@@ -928,6 +950,49 @@ namespace WarbandParser
             return Result;
         }
 
+        private static MenuParams ParseSubMenuLine(ParseArg SubMenuLine)
+        {
+            var Result = new MenuParams();
+
+            if (IsLineStartsWithPrefix(SubMenuLine, "mno_"))
+            {
+                //  0            1               2..n
+                // ID, количество записей, какие-то записи, текст меню, флаги, имя двери
+                var MnoText = ReadSpecialRecords(SubMenuLine, 1);
+
+                Result.MenuID = MnoText.ID;
+
+                Result.MenuText = MnoText.Text;
+
+                var MnoDoor = ReadSpecialRecords(SubMenuLine, MnoText.ParamPos + 1);
+
+                if (MnoDoor.Text != ".")
+                    Result.DoorName = MnoDoor.Text;
+            }
+            return Result;
+        }
+
+        private static MenuParams ParseMenuLine(ParseArg MenuLine)
+        {
+            var Result = new MenuParams();
+
+            if (IsLineStartsWithPrefix(MenuLine, "menu_"))
+            {
+                var AllParams = MenuLine.Split(" ", StringSplitOptions.RemoveEmptyEntries);
+
+                if (AllParams.Length > 0)
+                {
+                    //  0      1           2             3..n
+                    // ID, флаги меню, текст меню, какие-то записи
+
+                    Result.MenuID = AllParams.First();
+
+                    Result.MenuText = AllParams[2]; // Всегда ли текст на 3 позиции?
+                }
+            }
+            return Result;
+        }
+
         private static List<ModTextRow> ParseMenuBlock(ParseArg MenuBlock)
         {
             var Result = new List<ModTextRow>();
@@ -938,9 +1003,11 @@ namespace WarbandParser
             {
                 foreach (var SubMenu in PartsOfMenu)
                 {
-                    var SubMenuID = GetStringArg(SubMenu, 1);
+                    var MenuOptions = ParseSubMenuLine(SubMenu);
 
-                    var SubMenuText = GetStringArg(SubMenu, 2).Replace("_", " ");
+                    var SubMenuID = MenuOptions.MenuID;
+
+                    var SubMenuText = MenuOptions.MenuText.Replace("_", " ");
 
                     // Т.к мы читаем блоки с меню, то адреса подменю будут ОТНОСИТЕЛЬНО начала menu_.
                     var MnoDataPos = ((SubMenu.Start + MenuBlock.Start), (SubMenu.End + MenuBlock.Start));
@@ -967,7 +1034,7 @@ namespace WarbandParser
                         DataPos      = MnoDataPos
                     });
 
-                    var DoorText = GetStringArg(SubMenu, 3).Replace("_", " ");
+                    var DoorText = MenuOptions.DoorName.Replace("_", " ");
 
                     if (!string.IsNullOrEmpty(DoorText) && DoorText != ".")
                     {
@@ -999,9 +1066,11 @@ namespace WarbandParser
             {
                 foreach (var Block in MenuBlocks)
                 {
-                    var MenuID = GetStringArg(Block, 1);
+                    var Menu = ParseMenuLine(Block);
 
-                    var MenuText = GetStringArg(Block, 2).Replace('_', ' ');
+                    var MenuID = Menu.MenuID;
+
+                    var MenuText = Menu.MenuText.Replace('_', ' ');
 
                     if (string.IsNullOrEmpty(MenuID) || string.IsNullOrEmpty(MenuText))
                     {
