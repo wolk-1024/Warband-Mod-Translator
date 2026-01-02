@@ -12,12 +12,7 @@
 
 Проверялась на глобальных модах:
 
-Prophesy of Pendor V3.9.5
-A World of Ice and Fire
-Perisno 1.5.3
-Warzone 1.2
-
-и некоторых других.
+Prophesy of Pendor V3.9.5, A World of Ice and Fire, Perisno 1.5.3, Warzone 1.2 и некоторых других.
 
 Утилита делалась на скорую руку, ещё весьма сырая, но рабочая.
 
